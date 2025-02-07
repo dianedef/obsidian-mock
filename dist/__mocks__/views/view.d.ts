@@ -1,0 +1,32 @@
+import { View as BaseView, type WorkspaceLeaf, type Menu, type ViewStateResult } from 'obsidian';
+export declare class View extends BaseView {
+    icon: string;
+    navigation: boolean;
+    containerEl: HTMLElement;
+    scope: any;
+    private onUnloadCallbacks;
+    constructor(leaf: WorkspaceLeaf);
+    onload(): void;
+    onunload(): void;
+    addOnUnload(callback: () => void): void;
+    getViewType(): string;
+    getDisplayText(): string;
+    getIcon(): string;
+    setState(_state: any, _result: ViewStateResult): Promise<void>;
+    getState(): any;
+    setEphemeralState(_state: any): void;
+    getEphemeralState(): any;
+    protected onOpen(): Promise<void>;
+    protected onClose(): Promise<void>;
+    onResize(): void;
+    onPaneMenu(_menu: Menu, _source: string): void;
+    onHeaderMenu(_menu: Menu): void;
+    load: import("vitest/dist").Mock<any, any>;
+    unload: import("vitest/dist").Mock<any, any>;
+    addChild: import("vitest/dist").Mock<any, any>;
+    removeChild: import("vitest/dist").Mock<any, any>;
+    register: import("vitest/dist").Mock<any, any>;
+    registerEvent: import("vitest/dist").Mock<any, any>;
+    registerDomEvent: import("vitest/dist").Mock<any, any>;
+    registerInterval: import("vitest/dist").Mock<any, any>;
+}

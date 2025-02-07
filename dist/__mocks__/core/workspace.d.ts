@@ -1,0 +1,38 @@
+import type { App, WorkspaceLeaf, WorkspaceParent, WorkspaceItem } from 'obsidian';
+import { WorkspaceSplit } from './workspace-components';
+import { Events as EventsImpl } from '../components/events';
+export declare class MockWorkspace extends EventsImpl {
+    rootSplit: WorkspaceSplit;
+    leftSplit: WorkspaceSplit | null;
+    rightSplit: WorkspaceSplit | null;
+    floatingSplit: WorkspaceSplit | null;
+    activeLeaf: WorkspaceLeaf | null;
+    leftRibbon: HTMLElement;
+    rightRibbon: HTMLElement;
+    containerEl: HTMLElement;
+    layoutReady: boolean;
+    readonly app: App;
+    constructor(app: App);
+    getLeaf(): WorkspaceLeaf;
+    getLeftLeaf(): WorkspaceLeaf;
+    getRightLeaf(): WorkspaceLeaf;
+    createLeafInParent(parent: WorkspaceParent): WorkspaceLeaf;
+    setActiveLeaf(leaf: WorkspaceLeaf | null): void;
+    splitLeaf(_leaf: WorkspaceLeaf, newLeaf: WorkspaceLeaf): WorkspaceLeaf;
+    duplicateLeaf(leaf: WorkspaceLeaf): Promise<WorkspaceLeaf>;
+    iterateLeaves(callback: (leaf: WorkspaceLeaf) => any, item?: WorkspaceItem): void;
+    getLeavesOfType(type: string): WorkspaceLeaf[];
+    detachLeavesOfType(type: string): void;
+    moveLeafToPopout(): void;
+    getAncestorOfType(el: HTMLElement): WorkspaceLeaf | null;
+    saveLayout(): Promise<void>;
+    loadLayout(): Promise<void>;
+    createLeaf(): WorkspaceLeaf;
+    getActiveViewOfType<T extends WorkspaceLeaf>(type: string): T | null;
+    removeChild(): void;
+    onLayoutChange(): void;
+    iterateRootLeaves(callback: (leaf: WorkspaceLeaf) => any): void;
+    getLastActiveLeaf(): WorkspaceLeaf | null;
+    getActiveLeafOfType<T extends WorkspaceLeaf>(type: string): T | null;
+    openPopoutLeaf(): WorkspaceLeaf;
+}

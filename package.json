@@ -1,0 +1,61 @@
+{
+    "name": "obsidian-mock",
+    "version": "1.0.0",
+    "description": "A comprehensive mocking library for Obsidian.md plugin development",
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "lint": "eslint . --ext .ts",
+        "lint:fix": "eslint . --ext .ts --fix",
+        "format": "prettier --write .",
+        "prepublishOnly": "pnpm run build && pnpm run test",
+        "release": "pnpm run build && pnpm publish"
+    },
+    "keywords": [
+        "obsidian",
+        "mock",
+        "test",
+        "testing",
+        "plugin",
+        "development"
+    ],
+    "author": "Czecez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/czecez/obsidian-mock"
+    },
+    "bugs": {
+        "url": "https://github.com/czecez/obsidian-mock/issues"
+    },
+    "homepage": "https://github.com/czecez/obsidian-mock#readme",
+    "publishConfig": {
+        "registry": "https://registry.npmjs.org/",
+        "access": "public"
+    },
+    "peerDependencies": {
+        "obsidian": "^1.4.0"
+    },
+    "devDependencies": {
+        "@types/jest": "^29.5.14",
+        "@types/jsdom": "^21.1.7",
+        "@types/node": "^22.13.0",
+        "@vitest/coverage-v8": "^3.0.4",
+        "jsdom": "^26.0.0",
+        "obsidian": "^1.7.2",
+        "typescript": "^5.7.3",
+        "vite-tsconfig-paths": "^4.3.2",
+        "vitest": "^1.6.0",
+        "tsup": "^8.0.2"
+    }
+}
