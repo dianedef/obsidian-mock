@@ -1,15 +1,29 @@
 import { vi } from 'vitest';
-import type { App, Command, EditorSuggest, HoverLinkSource, MarkdownPostProcessor, ObsidianProtocolHandler, Plugin as IPlugin, PluginManifest, PluginSettingTab, ViewCreator } from 'obsidian';
+import type { App, Command, EditorSuggest, HoverLinkSource, MarkdownPostProcessor, ObsidianProtocolHandler, Plugin as IPlugin, PluginManifest, PluginSettingTab, ViewCreator, EventRef } from 'obsidian';
 import { MockComponent } from './components/component';
 
-export class MockPlugin extends MockComponent {
+export class Plugin extends MockComponent {
     app: App;
     manifest: PluginManifest;
+    private data: any = {};
+    private registeredEvents: EventRef[] = [];
+    private defaultData: any = {};
 
     constructor(app: App, manifest: PluginManifest) {
         super();
         this.app = app;
         this.manifest = manifest;
+
+        // Override onunload to handle event cleanup
+        this.onunload = vi.fn().mockImplementation(() => {
+            // Clean up registered events
+            this.registeredEvents.forEach(eventRef => {
+                if ('unregister' in eventRef) {
+                    (eventRef as any).unregister();
+                }
+            });
+            this.registeredEvents = [];
+        });
     }
 
     addRibbonIcon = vi.fn((icon: string, title: string, callback: (evt: MouseEvent) => any): HTMLElement => {
@@ -72,6 +86,10 @@ export class MockPlugin extends MockComponent {
         // Mock d'enregistrement d'extension d'éditeur
     });
 
+    unregisterEditorExtension = vi.fn((_extension: any): void => {
+        // Mock de désenregistrement d'extension d'éditeur
+    });
+
     registerObsidianProtocolHandler = vi.fn((_action: string, _handler: ObsidianProtocolHandler): void => {
         // Mock d'enregistrement de gestionnaire de protocole
     });
@@ -80,13 +98,51 @@ export class MockPlugin extends MockComponent {
         // Mock d'enregistrement de suggestions d'éditeur
     });
 
-    loadData = vi.fn(async (): Promise<any> => {
-        return {};
+    loadData = vi.fn().mockImplementation(async (): Promise<any> => {
+        try {
+            // Simuler un délai de chargement réaliste
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
+            // Fusionner les données par défaut avec les données sauvegardées
+            return { ...this.defaultData, ...this.data };
+        } catch (error) {
+            console.error('Error loading plugin data:', error);
+            // En cas d'erreur, retourner les données par défaut
+            return { ...this.defaultData };
+        }
     });
 
-    saveData = vi.fn(async (_data: any): Promise<void> => {
-        // Mock de sauvegarde de données
+    saveData = vi.fn().mockImplementation(async (data: any): Promise<void> => {
+        try {
+            // Simuler un délai de sauvegarde réaliste
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
+            // Sauvegarder uniquement les données qui diffèrent des valeurs par défaut
+            const changedData: any = {};
+            for (const [key, value] of Object.entries(data)) {
+                if (JSON.stringify(value) !== JSON.stringify(this.defaultData[key])) {
+                    changedData[key] = value;
+                }
+            }
+            
+            this.data = changedData;
+            
+            // Déclencher l'événement de changement de paramètres
+            this.onExternalSettingsChange();
+        } catch (error) {
+            console.error('Error saving plugin data:', error);
+            throw error;
+        }
     });
+
+    // Méthode utilitaire pour définir les valeurs par défaut
+    setDefaultData(defaults: any): void {
+        this.defaultData = { ...defaults };
+        // Initialiser les données avec les valeurs par défaut si elles sont vides
+        if (Object.keys(this.data).length === 0) {
+            this.data = { ...defaults };
+        }
+    }
 
     onUserEnable(): void {
         // À surcharger par les sous-classes
@@ -94,5 +150,25 @@ export class MockPlugin extends MockComponent {
 
     onExternalSettingsChange(): void {
         // À surcharger par les sous-classes
+    }
+
+    registerEvent = vi.fn((eventRef: EventRef): void => {
+        if (eventRef) {
+            this.registeredEvents.push(eventRef);
+        }
+    });
+
+    // Méthode utilitaire pour tester les événements de presse-papier
+    simulateEditorPaste(files: File[]): void {
+        const dataTransfer = new DataTransfer();
+        files.forEach(file => dataTransfer.items.add(file));
+        
+        const pasteEvent = new ClipboardEvent('paste', {
+            clipboardData: dataTransfer,
+            bubbles: true,
+            cancelable: true
+        });
+
+        this.app.workspace.containerEl.dispatchEvent(pasteEvent);
     }
 } 

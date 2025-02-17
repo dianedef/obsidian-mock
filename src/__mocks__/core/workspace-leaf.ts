@@ -1,5 +1,4 @@
 import { vi } from 'vitest';
-import { View as ObsidianView, Modifier, KeymapContext, WorkspaceItem } from 'obsidian';
 import type {
     WorkspaceLeaf as IWorkspaceLeaf,
     ViewState,
@@ -13,118 +12,13 @@ import type {
     KeymapEventListener,
     WorkspaceTabs,
     WorkspaceMobileDrawer,
-    WorkspaceParent
+    WorkspaceParent,
+    OpenViewState,
+    IconName,
+    View
 } from 'obsidian';
 import { Events } from '../components/events';
-import { WorkspaceItem as WorkspaceItemMock } from './workspace-items';
-
-// Spies pour les méthodes principales
-export const viewSpies = {
-    onOpen: vi.fn().mockResolvedValue(undefined),
-    onClose: vi.fn().mockResolvedValue(undefined),
-    onload: vi.fn(),
-    onunload: vi.fn(),
-    setState: vi.fn().mockResolvedValue(undefined),
-    onResize: vi.fn(),
-};
-
-export class MockView extends ObsidianView {
-    navigation = false;
-    icon = 'document';
-    children: Component[] = [];
-    events: EventRef[] = [];
-    app: App;
-    scope: Scope;
-    
-    constructor(leaf: IWorkspaceLeaf) {
-        super(leaf);
-        this.containerEl = document.createElement('div');
-        this.app = (leaf as any).app;
-        const mockScope = {
-            register: vi.fn().mockReturnValue({
-                modifiers: [],
-                key: '',
-                func: () => {}
-            }),
-            unregister: vi.fn()
-        };
-        this.scope = mockScope;
-        mockScope.register = vi.fn().mockReturnValue({
-            scope: mockScope,
-            modifiers: [],
-            key: '',
-            func: () => {}
-        });
-    }
-
-    onload = vi.fn();
-    onunload = vi.fn();
-    onResize = vi.fn();
-    onPaneMenu = vi.fn();
-    onHeaderMenu = vi.fn();
-    
-    getViewType = vi.fn().mockReturnValue('default');
-    getDisplayText = vi.fn().mockReturnValue('View');
-    getIcon = vi.fn().mockReturnValue(this.icon);
-    
-    setState = vi.fn().mockImplementation((state: any, result: any) => {
-        return Promise.resolve();
-    });
-    
-    getState = vi.fn().mockReturnValue({});
-    getEphemeralState = vi.fn().mockReturnValue({});
-    
-    setViewData = vi.fn();
-    clear = vi.fn();
-    getScroll = vi.fn().mockReturnValue({ top: 0, left: 0 });
-    applyScroll = vi.fn();
-    
-    load = vi.fn();
-    unload = vi.fn();
-
-    addChild = vi.fn().mockImplementation(<T extends Component>(component: T): T => {
-        this.children.push(component);
-        return component;
-    });
-
-    removeChild = vi.fn().mockImplementation(<T extends Component>(component: T): T => {
-        const index = this.children.indexOf(component);
-        if (index > -1) {
-            this.children.splice(index, 1);
-        }
-        return component;
-    });
-
-    register = vi.fn().mockImplementation((modifiers: Modifier[], context: string, listener: KeymapEventListener): void => {
-        if (this.scope) {
-            this.scope.register(modifiers, context, listener);
-        }
-    });
-
-    registerEvent = vi.fn().mockImplementation((eventRef: EventRef): void => {
-        this.events.push(eventRef);
-    });
-
-    registerDomEvent = vi.fn().mockImplementation((
-        el: Window | Document | HTMLElement,
-        type: string,
-        callback: (ev: Event) => any,
-        options?: boolean | AddEventListenerOptions
-    ): void => {
-        if (el) {
-            el.addEventListener(type, callback, options);
-        }
-    });
-
-    registerInterval = vi.fn().mockImplementation((id: number): number => {
-        return id;
-    });
-}
-
-class EmptyView extends MockView {
-    getViewType = vi.fn().mockReturnValue('empty');
-    getDisplayText = vi.fn().mockReturnValue('Empty');
-}
+import { DefaultView } from '../views/default-view';
 
 // Spies pour les méthodes de WorkspaceLeaf
 export const leafSpies = {
@@ -136,143 +30,158 @@ export const leafSpies = {
     setGroup: vi.fn(),
 };
 
-export class WorkspaceLeaf extends WorkspaceItem implements IWorkspaceLeaf {
-    view: MockView;
-    containerEl: HTMLElement;
-    width: number;
-    height: number;
-    group: string;
-    pinned: boolean;
-    working: boolean;
-    parent!: WorkspaceTabs | WorkspaceMobileDrawer;
+export class WorkspaceLeaf extends Events implements IWorkspaceLeaf {
+    containerEl: HTMLElement = document.createElement('div');
+    tabHeaderEl: HTMLElement = document.createElement('div');
+    tabHeaderInnerTitleEl: HTMLElement = document.createElement('div');
+    tabHeaderInnerIconEl: HTMLElement = document.createElement('div');
 
-    constructor(parent: WorkspaceParent) {
+    view: View;
+    app: App;
+    parent: WorkspaceTabs | WorkspaceMobileDrawer;
+    width: number = 0;
+    height: number = 0;
+    working: boolean = false;
+
+    private _pinned: boolean = false;
+    private _group: string = '';
+    private _isDeferred: boolean = false;
+
+    constructor(app: App, parent: WorkspaceTabs | WorkspaceMobileDrawer) {
         super();
-        this.parent = parent as WorkspaceTabs | WorkspaceMobileDrawer;
-        this.containerEl = document.createElement('div');
-        this.width = 0;
-        this.height = 0;
-        this.group = '';
-        this.pinned = false;
-        this.working = false;
-        this.view = new EmptyView(this as unknown as IWorkspaceLeaf);
-    }
-
-    on(name: 'pinned-change', callback: (pinned: boolean) => any, ctx?: any): EventRef;
-    on(name: 'group-change', callback: (group: string) => any, ctx?: any): EventRef;
-    on(name: string, callback: (...data: any[]) => any, ctx?: any): EventRef {
-        return super.on(name, callback, ctx);
+        this.app = app;
+        this.parent = parent;
+        this.containerEl.classList.add('workspace-leaf');
+        this.containerEl.setAttribute('data-type', 'leaf');
+        this.view = new DefaultView(this);
     }
 
     setPinned(pinned: boolean): void {
-        this.pinned = pinned;
-        this.trigger('pinned-change', this);
+        this._pinned = pinned;
+        this.trigger('pinned-change', pinned);
     }
 
-    setGroup(group: string | null): void {
-        this.group = group || '';
-        this.trigger('group-change', this.group);
+    isPinned(): boolean {
+        return this._pinned;
     }
 
-    getRoot(): WorkspaceContainer {
-        return this.parent.getRoot() as WorkspaceContainer;
+    setGroup(group: string): void {
+        this._group = group;
+        this.trigger('group-change', group);
     }
-    
-    getContainer(): WorkspaceContainer {
-        return this.parent.getContainer() as WorkspaceContainer;
+
+    getGroup(): string {
+        return this._group;
     }
-    
-    async openFile(file: TFile, openState?: ViewState): Promise<void> {
-        leafSpies.openFile(file, openState);
-        this.trigger('file-open', file);
-        if (openState) {
-            await this.setViewState(openState);
-        }
+
+    setDeferred(deferred: boolean): void {
+        this._isDeferred = deferred;
     }
-    
-    async open(view: MockView): Promise<MockView> {
-        leafSpies.open(view);
-        if (this.view && this.view !== view) {
-            await this.detach();
+
+    get isDeferred(): boolean {
+        return this._isDeferred;
+    }
+
+    getRoot(): WorkspaceParent {
+        return this.parent;
+    }
+
+    async openFile(file: TFile, openState?: OpenViewState): Promise<void> {
+        return Promise.resolve();
+    }
+
+    async open(view: View): Promise<View> {
+        if (this.view) {
+            await this.view.onunload();
         }
         this.view = view;
-        view.leaf = this as unknown as IWorkspaceLeaf;
-        if (view.containerEl) {
-            this.containerEl.textContent = '';
-            this.containerEl.appendChild(view.containerEl);
-        }
-        view.load();
-        view.onload();
+        await view.onload();
         this.trigger('view-change', view);
         return view;
     }
 
     getViewState(): ViewState {
         return {
-            type: this.view.getViewType(),
-            state: this.view.getState(),
+            type: this.view?.getViewType() || '',
+            state: this.view?.getState() || {},
             active: false,
-            pinned: this.pinned,
-            group: this.group ? this as unknown as IWorkspaceLeaf : undefined
+            pinned: this._pinned,
+            group: this._group
         };
     }
 
     async setViewState(viewState: ViewState, eState?: any): Promise<void> {
-        leafSpies.setViewState(viewState, eState);
-        if (viewState.pinned !== undefined) {
-            this.setPinned(viewState.pinned);
-        }
-        if (viewState.group !== undefined) {
-            this.setGroup(typeof viewState.group === 'string' ? viewState.group : null);
-        }
-        await this.view.setState(viewState.state, eState);
-    }
-    
-    getEphemeralState(): any {
-        return {};
-    }
-    
-    setEphemeralState(state: any): void {}
-    
-    togglePinned(): void {
-        this.setPinned(!this.pinned);
-    }
-    
-    async detach(): Promise<void> {
-        leafSpies.detach();
         if (this.view) {
-            this.view.unload();
-            this.view.onunload();
-            if (this.view.containerEl) {
-                this.view.containerEl.remove();
+            await this.view.setState(viewState.state, { history: false });
+            if (eState) {
+                this.view.setEphemeralState(eState);
             }
         }
-        this.view = new EmptyView(this as unknown as IWorkspaceLeaf);
-        this.trigger('view-change', this.view);
-    }
-    
-    setGroupMember(other: IWorkspaceLeaf): void {}
-    
-    get isDeferred(): boolean {
-        return false;
-    }
-    
-    async loadIfDeferred(): Promise<void> {
-        return Promise.resolve();
     }
 
-    getIcon(): string {
-        return this.view.getIcon();
+    getEphemeralState(): any {
+        return this.view?.getEphemeralState() || {};
     }
-    
+
+    setEphemeralState(state: any): void {
+        this.view?.setEphemeralState(state);
+    }
+
+    togglePinned(): void {
+        this.setPinned(!this._pinned);
+    }
+
+    detach(): void {
+        if (this.parent && 'removeLeaf' in this.parent) {
+            this.parent.removeLeaf(this);
+            (this.app.workspace as any).detachLeaf(this);
+        }
+    }
+
     getDisplayText(): string {
-        return this.view.getDisplayText();
+        return this.view?.getDisplayText() || '';
+    }
+
+    getIcon(): IconName {
+        return this.view?.getIcon() as IconName || 'document';
     }
 
     onResize(): void {
+        this.view?.onResize();
         this.trigger('resize');
-        if (this.view) {
-            this.view.onResize();
+    }
+
+    onPaneMenu(menu: Menu, source: string): void {
+        // Implementation
+    }
+
+    onload(): void {
+        this.trigger('load');
+    }
+
+    onunload(): void {
+        this.trigger('unload');
+    }
+
+    async loadIfDeferred(): Promise<void> {
+        if (this._isDeferred && this.view) {
+            this._isDeferred = false;
+            await this.open(this.view);
         }
+    }
+
+    getContainer(): WorkspaceContainer {
+        return this.parent.getContainer() as WorkspaceContainer;
+    }
+
+    setGroupMember(other: IWorkspaceLeaf): void {
+        const group = other.getGroup?.();
+        if (group) {
+            this.setGroup(group);
+        }
+    }
+
+    offref(ref: EventRef): void {
+        // Implementation
     }
 } 

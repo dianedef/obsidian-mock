@@ -1,20 +1,33 @@
-import { Keymap as IKeymap } from 'obsidian';
 import { vi } from 'vitest';
+import type { Keymap as IKeymap, KeymapEventHandler, KeymapContext, Modifier } from 'obsidian';
 
 export class Keymap implements IKeymap {
-    pushScope(scope: string): void {
-        // Implementation
-    }
+    private keymaps: Map<string, KeymapEventHandler> = new Map();
 
-    popScope(scope: string): void {
-        // Implementation
-    }
+    pushScope = vi.fn();
+    popScope = vi.fn();
 
-    static isModifier(evt: MouseEvent | TouchEvent | KeyboardEvent, modifier: string): boolean {
-        return false;
-    }
+    isModifier = vi.fn().mockImplementation((evt: KeyboardEvent, modifier: Modifier): boolean => {
+        switch (modifier) {
+            case 'Mod':
+                return evt.ctrlKey || evt.metaKey;
+            case 'Ctrl':
+                return evt.ctrlKey;
+            case 'Meta':
+                return evt.metaKey;
+            case 'Shift':
+                return evt.shiftKey;
+            case 'Alt':
+                return evt.altKey;
+            default:
+                return false;
+        }
+    });
 
-    static isModEvent(evt: MouseEvent | TouchEvent | KeyboardEvent): boolean {
-        return false;
-    }
+    checkModifiers = vi.fn().mockImplementation((evt: KeyboardEvent, modifiers: Modifier[]): boolean => {
+        return modifiers.every(modifier => this.isModifier(evt, modifier));
+    });
+
+    onTrigger = vi.fn();
+    onRelease = vi.fn();
 } 

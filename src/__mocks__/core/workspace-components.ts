@@ -1,142 +1,35 @@
 import { vi } from 'vitest';
-import { App, Events } from 'obsidian';
 import type { 
-    WorkspaceItem as IWorkspaceItem,
-    WorkspaceParent as IWorkspaceParent,
-    WorkspaceContainer as IWorkspaceContainer,
+    App,
+    Events as IEvents,
+    WorkspaceContainer,
     WorkspaceSplit as IWorkspaceSplit,
     WorkspaceSidedock as IWorkspaceSidedock,
     WorkspaceTabs as IWorkspaceTabs,
     WorkspaceRoot as IWorkspaceRoot,
-    WorkspaceWindow as IWorkspaceWindow,
-    WorkspaceLeaf as IWorkspaceLeaf,
+    WorkspaceWindow,
+    WorkspaceLeaf,
     WorkspaceMobileDrawer as IWorkspaceMobileDrawer,
-    PaneType,
     View,
     ViewState,
-    Scope
+    WorkspaceParent,
+    SplitDirection
 } from 'obsidian';
+import { Events } from '../components/events';
+import { WorkspaceItem } from './workspace-items';
+import { WorkspaceLeaf as WorkspaceLeafImpl } from './workspace-leaf';
+import { WorkspaceContainer as WorkspaceContainerImpl } from './workspace-container';
 
-// Mock de la classe Scope
-class MockScope implements Scope {
-    register = vi.fn();
-    unregister = vi.fn();
-}
+export class WorkspaceRoot extends WorkspaceContainerImpl implements IWorkspaceRoot {
+    children: WorkspaceLeaf[] = [];
+    activeLeaf: WorkspaceLeaf | null = null;
 
-// Create a basic View mock
-const createBasicView = (app: App): View => {
-    const scope = new MockScope();
-
-    const view = {
-        getViewType: vi.fn().mockReturnValue('markdown'),
-        getState: vi.fn().mockReturnValue({ type: 'markdown' } as ViewState),
-        getEphemeralState: vi.fn().mockReturnValue({}),
-        setState: vi.fn(),
-        setEphemeralState: vi.fn(),
-        leaf: null as any,
-        app,
-        containerEl: document.createElement('div'),
-        navigation: true,
-        icon: 'document',
-        getIcon: vi.fn().mockReturnValue('document'),
-        onload: vi.fn(),
-        onunload: vi.fn(),
-        onOpen: vi.fn(),
-        onClose: vi.fn(),
-        onResize: vi.fn(),
-        onPaneMenu: vi.fn(),
-        getDisplayText: vi.fn().mockReturnValue('Mock View'),
-        scope,
-        load: vi.fn(),
-        unload: vi.fn(),
-        addChild: vi.fn(),
-        removeChild: vi.fn(),
-        register: vi.fn(),
-        registerEvent: vi.fn(),
-        registerDomEvent: vi.fn(),
-        registerInterval: vi.fn()
-    };
-
-    return view as unknown as View;
-};
-
-// Create a basic WorkspaceLeaf mock
-const createBasicLeaf = (app: App): IWorkspaceLeaf => {
-    const view = createBasicView(app);
-    const leaf = {
-        view,
-        containerEl: document.createElement('div'),
-        width: 0,
-        height: 0,
-        parent: null as any,
-        win: window,
-        doc: document,
-        getViewState: vi.fn().mockReturnValue({}),
-        setViewState: vi.fn(),
-        setPinned: vi.fn(),
-        setGroupMember: vi.fn(),
-        setDimension: vi.fn(),
-        getContainer: vi.fn(),
-        getRoot: vi.fn(),
-        tabHeaderEl: document.createElement('div'),
-        tabHeaderInnerIconEl: document.createElement('div'),
-        tabHeaderInnerTitleEl: document.createElement('div'),
-        getDisplayText: vi.fn().mockReturnValue(''),
-        pinned: false,
-        activeTime: Date.now(),
-        working: false,
-        children: [],
-        addChild: vi.fn(),
-        removeChild: vi.fn(),
-        replaceChild: vi.fn(),
-        on: vi.fn().mockReturnValue({ id: 'event-ref-id' }),
-        off: vi.fn(),
-        trigger: vi.fn(),
-        openFile: vi.fn().mockResolvedValue(undefined),
-        open: vi.fn().mockResolvedValue(undefined),
-        isDeferred: false,
-        loadIfDeferred: vi.fn().mockResolvedValue(undefined),
-        getEphemeralState: vi.fn().mockReturnValue({}),
-        setEphemeralState: vi.fn(),
-        togglePinned: vi.fn(),
-        setGroup: vi.fn(),
-        detach: vi.fn(),
-        setRoot: vi.fn(),
-        setParent: vi.fn(),
-        getWindow: vi.fn().mockReturnValue(window),
-        getIcon: vi.fn().mockReturnValue('document'),
-        onResize: vi.fn(),
-        offref: vi.fn(),
-        tryTrigger: vi.fn()
-    };
-
-    view.leaf = leaf;
-    return leaf as unknown as IWorkspaceLeaf;
-};
-
-export class WorkspaceRoot extends Events implements IWorkspaceRoot, IWorkspaceContainer {
-    containerEl: HTMLElement = document.createElement('div');
-    win: Window = window;
-    doc: Document = document;
-    children: IWorkspaceLeaf[] = [];
-    activeLeaf: IWorkspaceLeaf | null = null;
-    parent: IWorkspaceParent;
-
-    constructor(public app: App) {
-        super();
-        this.parent = this as unknown as IWorkspaceParent;
+    constructor(app: App) {
+        super(app);
     }
 
-    getRoot(): IWorkspaceContainer {
-        return this;
-    }
-
-    getContainer(): IWorkspaceContainer {
-        return this;
-    }
-
-    addChild(child: IWorkspaceLeaf, index?: number): void {
-        if (typeof index === 'number') {
+    addChild(child: WorkspaceLeaf, index?: number): void {
+        if (index !== undefined) {
             this.children.splice(index, 0, child);
         } else {
             this.children.push(child);
@@ -144,122 +37,68 @@ export class WorkspaceRoot extends Events implements IWorkspaceRoot, IWorkspaceC
         (child as any).parent = this;
     }
 
-    removeChild(child: IWorkspaceLeaf): void {
+    removeChild(child: WorkspaceLeaf): void {
         const index = this.children.indexOf(child);
         if (index > -1) {
             this.children.splice(index, 1);
+            (child as any).parent = null;
         }
     }
 
-    setActiveLeaf(leaf: IWorkspaceLeaf | null): void {
+    setActiveLeaf(leaf: WorkspaceLeaf | null): void {
         this.activeLeaf = leaf;
-        this.trigger('active-leaf-change', leaf);
     }
 
-    getActiveLeaf(): IWorkspaceLeaf | null {
+    getActiveLeaf(): WorkspaceLeaf | null {
         return this.activeLeaf;
     }
 
-    createLeaf(): IWorkspaceLeaf {
-        const leaf = createBasicLeaf(this.app);
-        (leaf as any).parent = this;
-        this.children.push(leaf);
+    createLeaf(): WorkspaceLeaf {
+        const leaf = new WorkspaceLeafImpl(this.app, this);
+        this.addChild(leaf);
         return leaf;
     }
 }
 
-export class WorkspaceSidedock extends Events implements IWorkspaceSidedock {
-    containerEl: HTMLElement = document.createElement('div');
-    win: Window = window;
-    doc: Document = document;
-    children: IWorkspaceLeaf[] = [];
+export class WorkspaceSidedock extends WorkspaceItem implements IWorkspaceSidedock {
+    children: WorkspaceLeaf[] = [];
     collapsed: boolean = false;
-    parent: IWorkspaceParent;
     side: 'left' | 'right';
 
-    constructor(parent: IWorkspaceParent, app: App, side: 'left' | 'right') {
-        super();
-        this.parent = parent;
+    constructor(parent: WorkspaceParent, app: App, side: 'left' | 'right') {
+        super(app, parent);
         this.side = side;
     }
 
-    getRoot(): IWorkspaceContainer {
-        return this.parent.getRoot() as unknown as IWorkspaceContainer;
+    getRoot(): WorkspaceContainer {
+        return this.parent.getRoot();
     }
 
-    getContainer(): IWorkspaceContainer {
-        return this.parent.getContainer() as unknown as IWorkspaceContainer;
+    getContainer(): WorkspaceContainer {
+        return this.parent.getContainer();
     }
 
-    addChild(child: IWorkspaceLeaf): void {
+    addChild(child: WorkspaceLeaf): void {
         this.children.push(child);
         (child as any).parent = this;
     }
 
-    removeChild(child: IWorkspaceLeaf): void {
+    removeChild(child: WorkspaceLeaf): void {
         const index = this.children.indexOf(child);
         if (index > -1) {
             this.children.splice(index, 1);
+            (child as any).parent = null;
         }
     }
 
     expand(): void {
         this.collapsed = false;
-        this.trigger('collapse-change', false);
+        this.trigger('expand');
     }
 
     collapse(): void {
         this.collapsed = true;
-        this.trigger('collapse-change', true);
-    }
-
-    toggle(): void {
-        this.collapsed = !this.collapsed;
-        this.trigger('collapse-change', this.collapsed);
-    }
-}
-
-export class WorkspaceMobileDrawer extends Events implements IWorkspaceMobileDrawer {
-    containerEl: HTMLElement = document.createElement('div');
-    win: Window = window;
-    doc: Document = document;
-    children: IWorkspaceLeaf[] = [];
-    collapsed: boolean = false;
-    parent: IWorkspaceParent;
-
-    constructor(parent: IWorkspaceParent, app: App) {
-        super();
-        this.parent = parent;
-    }
-
-    getRoot(): IWorkspaceContainer {
-        return this.parent.getRoot() as unknown as IWorkspaceContainer;
-    }
-
-    getContainer(): IWorkspaceContainer {
-        return this.parent.getContainer() as unknown as IWorkspaceContainer;
-    }
-
-    addChild(child: IWorkspaceLeaf): void {
-        this.children.push(child);
-        (child as any).parent = this;
-    }
-
-    removeChild(child: IWorkspaceLeaf): void {
-        const index = this.children.indexOf(child);
-        if (index > -1) {
-            this.children.splice(index, 1);
-        }
-    }
-
-    expand(): void {
-        this.collapsed = false;
-        this.trigger('collapse-change', false);
-    }
-
-    collapse(): void {
-        this.collapsed = true;
-        this.trigger('collapse-change', true);
+        this.trigger('collapse');
     }
 
     toggle(): void {
@@ -267,6 +106,144 @@ export class WorkspaceMobileDrawer extends Events implements IWorkspaceMobileDra
             this.expand();
         } else {
             this.collapse();
+        }
+    }
+}
+
+export class WorkspaceMobileDrawer extends WorkspaceItem implements IWorkspaceMobileDrawer {
+    children: WorkspaceLeaf[] = [];
+    collapsed: boolean = false;
+
+    constructor(parent: WorkspaceParent, app: App) {
+        super(app, parent);
+    }
+
+    getRoot(): WorkspaceContainer {
+        return this.parent.getRoot();
+    }
+
+    getContainer(): WorkspaceContainer {
+        return this.parent.getContainer();
+    }
+
+    addChild(child: WorkspaceLeaf): void {
+        this.children.push(child);
+        (child as any).parent = this;
+    }
+
+    removeChild(child: WorkspaceLeaf): void {
+        const index = this.children.indexOf(child);
+        if (index > -1) {
+            this.children.splice(index, 1);
+            (child as any).parent = null;
+        }
+    }
+
+    expand(): void {
+        this.collapsed = false;
+        this.trigger('expand');
+    }
+
+    collapse(): void {
+        this.collapsed = true;
+        this.trigger('collapse');
+    }
+
+    toggle(): void {
+        if (this.collapsed) {
+            this.expand();
+        } else {
+            this.collapse();
+        }
+    }
+}
+
+export class WorkspaceSplit extends WorkspaceItem implements IWorkspaceSplit {
+    children: WorkspaceItem[] = [];
+
+    constructor(parent: WorkspaceParent | null, app: App) {
+        super(app, parent);
+    }
+
+    addLeaf(item: WorkspaceLeaf, index?: number): void {
+        const workspaceItem = item as unknown as WorkspaceItem;
+        if (index !== undefined) {
+            this.children.splice(index, 0, workspaceItem);
+        } else {
+            this.children.push(workspaceItem);
+        }
+        (item as any).parent = this;
+    }
+
+    removeChild(child: WorkspaceItem, index?: number): void {
+        if (index !== undefined) {
+            this.children.splice(index, 1);
+        } else {
+            const idx = this.children.indexOf(child);
+            if (idx > -1) {
+                this.children.splice(idx, 1);
+            }
+        }
+        (child as any).parent = null;
+    }
+
+    insertChild(item: WorkspaceItem, index: number): void {
+        this.children.splice(index, 0, item);
+        (item as any).parent = this;
+    }
+
+    replaceChild(oldChild: WorkspaceItem, newChild: WorkspaceItem): void {
+        const index = this.children.indexOf(oldChild);
+        if (index > -1) {
+            this.children[index] = newChild;
+            (oldChild as any).parent = null;
+            (newChild as any).parent = this;
+        }
+    }
+
+    getLeaf(): WorkspaceLeaf {
+        return new WorkspaceLeafImpl(this.app, this);
+    }
+
+    findLeaf(callback: (leaf: WorkspaceLeaf) => boolean): WorkspaceLeaf | null {
+        for (const child of this.children) {
+            if ('view' in child) {
+                const leaf = child as unknown as WorkspaceLeaf;
+                if (callback(leaf)) {
+                    return leaf;
+                }
+            }
+        }
+        return null;
+    }
+
+    removeLeaf(leaf: WorkspaceLeaf): void {
+        this.removeChild(leaf as unknown as WorkspaceItem);
+        this.trigger('leaf-deleted', leaf);
+    }
+}
+
+export class WorkspaceTabs extends WorkspaceItem implements IWorkspaceTabs {
+    children: WorkspaceLeaf[] = [];
+
+    constructor(parent: WorkspaceParent | null, app: App) {
+        super(app, parent);
+    }
+
+    addChild(child: WorkspaceLeaf, index?: number): void {
+        if (index !== undefined) {
+            this.children.splice(index, 0, child);
+        } else {
+            this.children.push(child);
+        }
+        (child as any).parent = this;
+    }
+
+    removeChild(child: WorkspaceLeaf): void {
+        const index = this.children.indexOf(child);
+        if (index > -1) {
+            this.children.splice(index, 1);
+            (child as any).parent = null;
         }
     }
 } 

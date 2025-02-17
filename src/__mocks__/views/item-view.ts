@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type { App, WorkspaceLeaf, Scope, Component, Menu } from 'obsidian';
-import { View } from './view';
+import { View } from '../core/view';
 import { ItemView as IItemView } from 'obsidian';
 
 // Extend HTMLElement prototype with Obsidian's DOM methods
@@ -62,7 +62,6 @@ export class ItemView extends View implements IItemView {
     // Component methods
     load = vi.fn();
     onload = vi.fn().mockImplementation((): void => {
-        // Mock de chargement
     });
     unload = vi.fn();
     onunload = vi.fn().mockImplementation((): void => {

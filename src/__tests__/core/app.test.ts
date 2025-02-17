@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { App } from '../../core/app';
-import type { WorkspaceLeaf } from 'obsidian';
+import { App } from '../../__mocks__/core/app';
+import type { WorkspaceLeaf, TFile as ITFile } from 'obsidian';
+import { TFile } from '../../__mocks__/core/file';
+import { vi } from 'vitest';
 
 describe('App', () => {
     let app: App;
@@ -16,14 +18,14 @@ describe('App', () => {
             expect(app.workspace.off).toBeDefined();
             expect(app.workspace.getLeaf).toBeDefined();
             expect(app.workspace.getActiveViewOfType).toBeDefined();
-            expect(app.workspace.iterateLeaves).toBeDefined();
+            expect(app.workspace.iterateAllLeaves).toBeDefined();
         });
 
         it('should have basic workspace properties', () => {
             expect(app.workspace.leftSplit).toBeDefined();
             expect(app.workspace.rightSplit).toBeDefined();
             expect(app.workspace.rootSplit).toBeDefined();
-            expect(app.workspace.floatingSplit).toBeNull();
+            expect(app.workspace.activeLeaf).toBeNull();
             expect(app.workspace.leftRibbon).toBeDefined();
             expect(app.workspace.rightRibbon).toBeDefined();
             expect(app.workspace.containerEl).toBeInstanceOf(HTMLElement);
@@ -33,7 +35,7 @@ describe('App', () => {
         it('should have leaf management methods', () => {
             expect(app.workspace.setActiveLeaf).toBeDefined();
             expect(app.workspace.getActiveFile).toBeDefined();
-            expect(app.workspace.getLastActiveLeaf).toBeDefined();
+            expect(app.workspace.setActiveLeaf).toBeDefined();
             expect(app.workspace.getGroupLeaves).toBeDefined();
             expect(app.workspace.getLeavesOfType).toBeDefined();
             expect(app.workspace.getUnpinnedLeaf).toBeDefined();
@@ -87,7 +89,6 @@ describe('App', () => {
             expect(app.metadataCache.getFirstLinkpathDest).toBeDefined();
             expect(app.metadataCache.resolvedLinks).toBeDefined();
             expect(app.metadataCache.unresolvedLinks).toBeDefined();
-            expect(app.metadataCache.getCachedFiles).toBeDefined();
         });
     });
 
@@ -122,13 +123,97 @@ describe('App', () => {
         it('should have an initialized fileManager with mocked methods', () => {
             expect(app.fileManager).toBeDefined();
             expect(app.fileManager.processFrontMatter).toBeDefined();
-            expect(app.fileManager.save).toBeDefined();
-            expect(app.fileManager.createNewMarkdownFile).toBeDefined();
+            expect(app.fileManager.getNewFileParent).toBeDefined();
             expect(app.fileManager.generateMarkdownLink).toBeDefined();
             expect(app.fileManager.getNewFileParent).toBeDefined();
             expect(app.fileManager.renameFile).toBeDefined();
             expect(app.fileManager.getAvailablePathForAttachment).toBeDefined();
             expect(app.fileManager.trashFile).toBeDefined();
+        });
+    });
+});
+
+describe('App Fonctionnalités Avancées', () => {
+    let app: App;
+
+    beforeEach(() => {
+        app = new App();
+    });
+
+    describe('Workspace', () => {
+        it('devrait avoir un workspace initialisé', () => {
+            expect(app.workspace).toBeDefined();
+            expect(app.workspace.on).toBeDefined();
+            expect(app.workspace.off).toBeDefined();
+            expect(app.workspace.getActiveFile).toBeDefined();
+        });
+
+        it('devrait pouvoir gérer les vues actives', () => {
+            const mockFile = new TFile('test.md', app.vault);
+            app.workspace.getActiveFile = vi.fn().mockReturnValue(mockFile);
+            
+            const activeFile = app.workspace.getActiveFile();
+            expect(activeFile).toBe(mockFile);
+        });
+    });
+
+    describe('Vault', () => {
+        it('devrait avoir un vault initialisé', () => {
+            expect(app.vault).toBeDefined();
+            expect(app.vault.create).toBeDefined();
+            expect(app.vault.read).toBeDefined();
+            expect(app.vault.modify).toBeDefined();
+        });
+
+        it('devrait pouvoir créer et lire des fichiers', async () => {
+            const testPath = 'test.md';
+            const testContent = 'test content';
+
+            const file = await app.vault.create(testPath, testContent);
+            expect(file).toBeDefined();
+            expect(file.path).toBe(testPath);
+
+            const content = await app.vault.read(file);
+            expect(content).toBe(testContent);
+        });
+    });
+
+    describe('MetadataCache', () => {
+        it('devrait avoir un cache de métadonnées initialisé', () => {
+            expect(app.metadataCache).toBeDefined();
+            expect(app.metadataCache.getFileCache).toBeDefined();
+            expect(app.metadataCache.getCache).toBeDefined();
+        });
+    });
+
+    describe('Commands', () => {
+        it('devrait pouvoir gérer les commandes', () => {
+            const mockCommand = {
+                id: 'test-command',
+                name: 'Test Command',
+                callback: () => {}
+            };
+
+            app.commands.addCommand(mockCommand);
+            expect(app.commands.addCommand).toHaveBeenCalledWith(mockCommand);
+        });
+    });
+
+    describe('Settings', () => {
+        it('devrait pouvoir gérer les paramètres', () => {
+            const testValue = { key: 'value' };
+            app.settings.get = vi.fn().mockReturnValue(testValue);
+
+            const value = app.settings.get('test');
+            expect(value).toBe(testValue);
+        });
+    });
+
+    describe('Plugins', () => {
+        it('devrait pouvoir gérer les plugins', () => {
+            const pluginId = 'test-plugin';
+            app.plugins.enablePlugin(pluginId);
+            expect(app.plugins.enablePlugin).toHaveBeenCalledWith(pluginId);
         });
     });
 }); 

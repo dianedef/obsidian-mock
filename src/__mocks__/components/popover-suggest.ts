@@ -7,7 +7,7 @@ export enum PopoverState {
     Loading = 'loading'
 }
 
-export abstract class MockPopoverSuggest<T> implements ISuggestOwner<T>, CloseableComponent {
+export abstract class PopoverSuggest<T> implements ISuggestOwner<T>, CloseableComponent {
     app: App;
     scope: Scope;
     suggestEl: HTMLElement;

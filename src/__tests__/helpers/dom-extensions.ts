@@ -1,4 +1,4 @@
-// Extension de HTMLElement pour simuler les méthodes d'Obsidian
+// Extension of HTMLElement to simulate Obsidian methods
 declare global {
     interface HTMLElement {
         createDiv(className?: string): HTMLDivElement;
@@ -8,7 +8,7 @@ declare global {
     }
 }
 
-// Implémentation des méthodes d'extension
+// Implementation of extension methods
 HTMLElement.prototype.createDiv = function(className?: string): HTMLDivElement {
     const div = document.createElement('div');
     if (className) {

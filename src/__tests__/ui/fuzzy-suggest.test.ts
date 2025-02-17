@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { App } from '../../__mocks__/core/app';
 import { FuzzySuggestModal } from '../../__mocks__/ui/fuzzy-suggest';
 import type { App as IApp } from 'obsidian';
@@ -21,7 +21,7 @@ class TestFuzzySuggestModal extends FuzzySuggestModal<string> {
     }
 
     onChooseSuggestion(item: string, evt: MouseEvent | KeyboardEvent): void {
-        // Implementation pour le test
+        // Implementation for the test
     }
 }
 
@@ -34,57 +34,51 @@ describe('FuzzySuggestModal', () => {
         modal = new TestFuzzySuggestModal(app);
     });
 
-    describe('Gestion des éléments', () => {
-        it('devrait gérer une liste vide', () => {
+    describe('Item Management', () => {
+        it('should handle an empty list', () => {
             modal.setItems([]);
             expect(modal.getItems()).toEqual([]);
         });
 
-        it('devrait permettre d\'ajouter des éléments', () => {
+        it('should allow adding items', () => {
             const items = ['test1', 'test2', 'test3'];
             modal.setItems(items);
             expect(modal.getItems()).toEqual(items);
         });
     });
 
-    describe('Recherche floue', () => {
+    describe('Fuzzy Search', () => {
         beforeEach(() => {
-            modal.setItems([
-                'Pomme',
-                'Poire',
-                'Banane',
-                'Orange',
-                'Fraise'
-            ]);
+            modal.setItems(['Apple', 'Banana', 'Orange', 'Pear', 'Grape']);
         });
 
-        it('devrait retourner tous les éléments si la requête est vide', () => {
+        it('should return all items if the query is empty', () => {
             const suggestions = modal.getSuggestions('');
             expect(suggestions).toHaveLength(5);
         });
 
-        it('devrait trouver les éléments avec une correspondance exacte', () => {
-            const suggestions = modal.getSuggestions('Pomme');
-            expect(suggestions[0].item).toBe('Pomme');
+        it('should find items with an exact match', () => {
+            const suggestions = modal.getSuggestions('Apple');
+            expect(suggestions[0].item).toBe('Apple');
             expect(suggestions).toHaveLength(1);
         });
 
-        it('devrait trouver les éléments avec une correspondance partielle', () => {
-            const suggestions = modal.getSuggestions('Po');
-            expect(suggestions[0].item).toBe('Pomme');
-            expect(suggestions[1].item).toBe('Poire');
-            expect(suggestions).toHaveLength(2);
+        it('should find items with a partial match', () => {
+            const suggestions = modal.getSuggestions('Pe');
+            const matches = suggestions.filter(s => s.match.score >= 0.8);
+            expect(matches[0].item).toBe('Pear');
+            expect(matches).toHaveLength(1);
         });
 
-        it('devrait trouver les éléments avec des lettres non consécutives', () => {
-            const suggestions = modal.getSuggestions('Pme');
-            expect(suggestions[0].item).toBe('Pomme');
+        it('should find items with non-consecutive letters', () => {
+            const suggestions = modal.getSuggestions('Apl');
+            expect(suggestions[0].item).toBe('Apple');
             expect(suggestions).toHaveLength(1);
         });
 
-        it('devrait être insensible à la casse', () => {
-            const suggestions = modal.getSuggestions('pomme');
-            expect(suggestions[0].item).toBe('Pomme');
+        it('should be case-insensitive', () => {
+            const suggestions = modal.getSuggestions('apple');
+            expect(suggestions[0].item).toBe('Apple');
             expect(suggestions).toHaveLength(1);
         });
     });

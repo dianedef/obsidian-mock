@@ -1,17 +1,18 @@
 import { vi } from 'vitest';
-import type { FileManager as IFileManager, App, TAbstractFile, TFile, TFolder } from 'obsidian';
-import { createMockFile } from '../utils/file-mock';
+import type { FileManager as IFileManager, App, TAbstractFile, TFile, TFolder, Events as IEvents } from 'obsidian';
+import { Events } from '../components/events';
 
 /**
  * Complete mock of the FileManager
  * @public
  */
-export class FileManager implements IFileManager {
+export class FileManager extends Events implements IFileManager {
     app: App;
     private vault: any;
     private fileTree: Map<string, TAbstractFile> = new Map();
 
     constructor(app: App) {
+        super();
         this.app = app;
         this.vault = app.vault;
         // Initialize root folder
@@ -51,9 +52,7 @@ export class FileManager implements IFileManager {
     /**
      * @public
      */
-    processFrontMatter = vi.fn().mockImplementation(async (file: TFile, fn: (frontmatter: any) => void) => {
-        fn({});
-    });
+    processFrontMatter = vi.fn();
 
     /**
      * @public
@@ -162,4 +161,76 @@ export class FileManager implements IFileManager {
     getBaseName = vi.fn().mockReturnValue('');
     getDisplayPath = vi.fn().mockReturnValue('');
     getUniqueFileName = vi.fn().mockReturnValue('');
+
+    /**
+     * Génère un préfixe pour les fichiers médias basé sur le frontmatter ou le titre
+     */
+    getMediaPrefix = vi.fn().mockImplementation(async (file: TFile): Promise<string> => {
+        try {
+            // Lire le frontmatter
+            const frontmatter = await this.processFrontMatter(file);
+            if (frontmatter && frontmatter['img-prefix']) {
+                return frontmatter['img-prefix'];
+            }
+
+            // Fallback sur le titre du fichier
+            return this.sanitizeFileName(file.basename);
+        } catch (error) {
+            console.error('Error getting media prefix:', error);
+            return this.sanitizeFileName(file.basename);
+        }
+    });
+
+    /**
+     * Génère un nom de fichier unique pour un média
+     */
+    generateUniqueMediaName = vi.fn().mockImplementation((originalName: string, prefix?: string): string => {
+        const timestamp = Date.now();
+        const ext = this.getFileExtension(originalName);
+        const sanitizedPrefix = prefix ? this.sanitizeFileName(prefix) : 'media';
+        return `${sanitizedPrefix}_${timestamp}.${ext}`;
+    });
+
+    /**
+     * Met à jour les liens des médias dans une note
+     */
+    updateMediaLinks = vi.fn().mockImplementation(async (file: TFile, oldPrefix: string, newPrefix: string): Promise<void> => {
+        try {
+            const content = await this.vault.read(file);
+            
+            // Regex pour trouver les liens d'images avec l'ancien préfixe
+            const mediaLinkRegex = new RegExp(`!\\[([^\\]]*)\\]\\(([^)]*${oldPrefix}[^)]*)\\)`, 'g');
+            
+            let newContent = content;
+            let hasChanges = false;
+            
+            // Remplacer chaque lien trouvé
+            newContent = content.replace(mediaLinkRegex, (match: string, alt: string, path: string) => {
+                hasChanges = true;
+                const fileName = path.split('/').pop() || '';
+                const newFileName = fileName.replace(oldPrefix, newPrefix);
+                return `![${alt}](${path.replace(fileName, newFileName)})`;
+            });
+
+            // Sauvegarder les changements si nécessaire
+            if (hasChanges) {
+                await this.vault.modify(file, newContent);
+                this.trigger('media-links-updated', { file, oldPrefix, newPrefix });
+            }
+        } catch (error) {
+            console.error('Error updating media links:', error);
+            throw error;
+        }
+    });
+
+    /**
+     * Nettoie un nom de fichier
+     */
+    private sanitizeFileName(name: string): string {
+        return name
+            .toLowerCase()
+            .replace(/[&]/g, 'and')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    }
 } 

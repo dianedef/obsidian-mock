@@ -59,7 +59,7 @@ export { DropdownComponent } from './__mocks__/ui/dropdown-component';
 export { ColorComponent } from './__mocks__/ui/color-component';
 
 // Services
-export { MockWorkspace as Workspace } from './__mocks__/core/workspace';
+export { Workspace } from './__mocks__/core/workspace';
 
 // Core
 export * from './__mocks__/core/file';

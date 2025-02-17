@@ -1,31 +1,35 @@
 import { vi } from 'vitest';
-import type { CachedMetadata, Events, EventRef, TFile } from 'obsidian';
+import type { MetadataCache as IMetadataCache, CachedMetadata, TFile } from 'obsidian';
+import { Events } from './components/events';
 
-export class MockMetadataCache implements Events {
-    resolvedLinks: Record<string, Record<string, number>> = {};
-    unresolvedLinks: Record<string, Record<string, number>> = {};
+export class MetadataCache extends Events implements IMetadataCache {
     private fileCache: Map<string, CachedMetadata> = new Map();
-    private eventHandlers: Map<string, Array<{ callback: Function; ctx?: any }>> = new Map();
+    resolvedLinks: Map<string, Record<string, number>> = new Map();
+    unresolvedLinks: Map<string, Record<string, number>> = new Map();
 
-    getFirstLinkpathDest = vi.fn((linkpath: string, sourcePath: string): TFile | null => {
-        return null;
-    });
-
-    getFileCache(file: TFile): CachedMetadata | null {
+    getFileCache = vi.fn().mockImplementation((file: TFile): CachedMetadata | null => {
         return this.fileCache.get(file.path) || null;
-    }
-
-    getCache(path: string): CachedMetadata | null {
-        return this.fileCache.get(path) || null;
-    }
-
-    fileToLinktext = vi.fn((file: TFile, sourcePath: string, omitMdExtension: boolean = true): string => {
-        let linktext = file.basename;
-        if (!omitMdExtension && file.extension === 'md') {
-            linktext += '.md';
-        }
-        return linktext;
     });
+
+    getCache = vi.fn().mockImplementation((path: string): CachedMetadata | null => {
+        return this.fileCache.get(path) || null;
+    });
+
+    fileToLinktext = vi.fn().mockImplementation((file: TFile, sourcePath: string, omitMdExtension?: boolean): string => {
+        return file.basename + (omitMdExtension ? '' : '.md');
+    });
+
+    getFirstLinkpathDest = vi.fn().mockReturnValue(null);
+
+    setCacheForFile = vi.fn().mockImplementation((file: TFile, cache: CachedMetadata): void => {
+        this.fileCache.set(file.path, cache);
+    });
+
+    deleteCacheForFile = vi.fn().mockImplementation((file: TFile): void => {
+        this.fileCache.delete(file.path);
+    });
+
+    getCachedFiles = vi.fn().mockReturnValue([]);
 
     // Event management methods
     on(name: string, callback: Function, ctx?: any): EventRef {
@@ -90,12 +94,12 @@ export class MockMetadataCache implements Events {
     }
 
     setResolvedLinks(sourcePath: string, links: Record<string, number>): void {
-        this.resolvedLinks[sourcePath] = links;
+        this.resolvedLinks.set(sourcePath, links);
         this.trigger('resolve', { path: sourcePath });
     }
 
     setUnresolvedLinks(sourcePath: string, links: Record<string, number>): void {
-        this.unresolvedLinks[sourcePath] = links;
+        this.unresolvedLinks.set(sourcePath, links);
     }
 
     triggerResolvedEvent(): void {

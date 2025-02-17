@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { App, FuzzyMatch, Instruction, SearchMatches, SearchMatchPart } from 'obsidian';
 import { Events } from '../components/events';
-import { Scope } from '../components/scope';
+import { Scope } from '../core/scope';
 
 export abstract class FuzzySuggestModal<T> extends Events {
     app: App;
@@ -96,73 +96,86 @@ export abstract class FuzzySuggestModal<T> extends Events {
         if (!query) {
             return this.items.map(item => ({
                 item,
-                match: {
-                    score: 0,
-                    matches: []
-                }
+                match: { score: 0, matches: [] }
             }));
         }
 
-        const normalizedQuery = query.toLowerCase();
-        const results: FuzzyMatch<T>[] = [];
+        const suggestions: FuzzyMatch<T>[] = [];
+        const lowerQuery = query.toLowerCase();
 
         for (const item of this.items) {
             const text = this.getItemText(item).toLowerCase();
-            const matches = this.findMatches(text, normalizedQuery);
+            const matches = this.findMatches(text, lowerQuery);
             if (matches.length > 0) {
-                results.push({
-                    item,
-                    match: {
-                        score: this.calculateScore(matches, text.length),
-                        matches
-                    }
-                });
+                const score = this.calculateScore(matches, text.length);
+                if (score > 0) {
+                    suggestions.push({
+                        item,
+                        match: { score, matches }
+                    });
+                }
             }
         }
 
-        return results.sort((a, b) => b.match.score - a.match.score);
+        return suggestions
+            .sort((a, b) => b.match.score - a.match.score)
+            .slice(0, this.limit);
     }
 
     private findMatches(text: string, query: string): SearchMatches {
-        const matches: SearchMatches = [];
-        let textIndex = 0;
-        
-        for (const queryChar of query) {
-            let found = false;
-            while (textIndex < text.length) {
-                if (text[textIndex] === queryChar) {
-                    const match: SearchMatchPart = [textIndex, textIndex + 1];
-                    matches.push(match);
-                    textIndex++;
-                    found = true;
-                    break;
-                }
-                textIndex++;
+        const matches: SearchMatchPart[] = [];
+        let lastIndex = 0;
+        let queryIndex = 0;
+
+        while (queryIndex < query.length) {
+            const char = query[queryIndex];
+            const index = text.indexOf(char, lastIndex);
+            
+            if (index === -1) {
+                return [];
             }
-            if (!found) return [];
+
+            matches.push({
+                start: index,
+                end: index + 1
+            });
+
+            lastIndex = index + 1;
+            queryIndex++;
         }
-        
+
         return matches;
     }
 
     private calculateScore(matches: SearchMatches, textLength: number): number {
         if (matches.length === 0) return 0;
-        
-        let consecutiveCount = 1;
-        let maxConsecutive = 1;
-        
-        for (let i = 1; i < matches.length; i++) {
-            if (matches[i][0] === matches[i-1][1]) {
-                consecutiveCount++;
-                maxConsecutive = Math.max(maxConsecutive, consecutiveCount);
-            } else {
-                consecutiveCount = 1;
+
+        // Calcul du score basé sur :
+        // 1. La longueur des correspondances par rapport à la longueur totale
+        // 2. La continuité des correspondances
+        // 3. La position des correspondances (préférence pour le début)
+
+        let totalLength = 0;
+        let continuityBonus = 0;
+        let positionScore = 0;
+
+        for (let i = 0; i < matches.length; i++) {
+            const match = matches[i];
+            totalLength += match.end - match.start;
+
+            // Bonus pour les correspondances au début
+            positionScore += 1 / (match.start + 1);
+
+            // Bonus pour les correspondances continues
+            if (i > 0 && matches[i - 1].end === match.start) {
+                continuityBonus += 0.5;
             }
         }
-        
-        const positionScore = matches.reduce((sum, match) => sum + (textLength - match[0]), 0);
-        
-        return maxConsecutive * 100 + positionScore;
+
+        const lengthScore = totalLength / textLength;
+        const score = (lengthScore + continuityBonus + positionScore) / 2;
+
+        return Math.min(Math.max(score, 0), 1);
     }
 
     abstract getItemText(item: T): string;

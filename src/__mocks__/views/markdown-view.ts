@@ -1,13 +1,16 @@
 import { vi } from 'vitest';
-import { MarkdownView as BaseMarkdownView, type Editor, type TFile, type WorkspaceLeaf, type HoverPopover, type Menu, type MarkdownPreviewView, type MarkdownViewModeType, type ViewStateResult } from 'obsidian';
+import type { MarkdownView as IMarkdownView, Editor, TFile, WorkspaceLeaf, HoverPopover, Menu, MarkdownViewModeType } from 'obsidian';
 import { EditorImpl } from '../components/editor';
+import { MarkdownPreviewView } from './markdown-preview-view';
+import { View } from '../core/view';
 
-export class MarkdownView extends BaseMarkdownView {
+export class MarkdownView extends View implements IMarkdownView {
     editor: Editor;
     previewMode: MarkdownPreviewView;
     file: TFile | null = null;
     hoverPopover: HoverPopover | null = null;
     data = '';
+    private currentMode: MarkdownViewModeType = 'source';
 
     // Déclaration des méthodes supplémentaires
     getScroll!: () => { top: number; left: number };
@@ -18,31 +21,33 @@ export class MarkdownView extends BaseMarkdownView {
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
         this.editor = new EditorImpl(this as any);
+        this.previewMode = new MarkdownPreviewView(null);
 
-        this.previewMode = {
-            containerEl: document.createElement('div'),
-            file: this.file as TFile,
-            app: this.app,
-            hoverPopover: {} as HoverPopover,
-            get: () => '',
-            set: vi.fn(),
-            clear: vi.fn(),
-            rerender: vi.fn(),
-            getScroll: () => 0,
-            applyScroll: vi.fn(),
-            onload: vi.fn(),
-            onunload: vi.fn()
-        } as unknown as MarkdownPreviewView;
+        // Configuration des événements de l'éditeur
+        this.editor.on('change', () => {
+            this.trigger('content-modified');
+        });
 
         // Méthodes de cycle de vie
         this.onOpen = vi.fn().mockResolvedValue(undefined);
         this.onClose = vi.fn().mockResolvedValue(undefined);
-        this.onunload = vi.fn();
+        this.onunload = vi.fn().mockImplementation(() => {
+            this.file = null;
+            return Promise.resolve();
+        });
         this.onload = vi.fn();
 
         // Méthodes de gestion des fichiers
-        this.onUnloadFile = vi.fn().mockResolvedValue(undefined);
-        this.onLoadFile = vi.fn().mockResolvedValue(undefined);
+        this.onUnloadFile = vi.fn().mockImplementation(async (file: TFile) => {
+            this.file = null;
+            return Promise.resolve();
+        });
+        this.onLoadFile = vi.fn().mockImplementation(async (file: TFile) => {
+            this.file = file;
+            this.previewMode = new MarkdownPreviewView(file);
+            this.trigger('file-changed', file);
+            return Promise.resolve();
+        });
         this.save = vi.fn().mockResolvedValue(undefined);
         this.onRename = vi.fn();
 
@@ -61,8 +66,56 @@ export class MarkdownView extends BaseMarkdownView {
         };
         this.getState = vi.fn().mockReturnValue(defaultState);
         this.setState = vi.fn();
-        this.setMode = vi.fn();
-        this.setViewData = vi.fn();
+        this.setMode = (mode: MarkdownViewModeType) => {
+            this.currentMode = mode;
+            this.trigger('mode-change', mode);
+        };
+        this.setViewData = (data: string, clear: boolean) => {
+            if (clear) {
+                this.clear();
+            }
+            this.data = data;
+            this.editor.setValue(data);
+        };
+
+        // Méthodes de gestion du mode
+        this.getMode = () => this.currentMode;
+        this.showPreview = () => {
+            this.setMode('preview');
+        };
+        this.showEdit = () => {
+            this.setMode('source');
+        };
+        this.toggleSourceAndPreview = () => {
+            if (this.currentMode === 'source') {
+                this.showPreview();
+            } else {
+                this.showEdit();
+            }
+        };
+
+        // Méthodes de gestion des références
+        this.extractReferences = () => {
+            const content = this.editor.getValue();
+            const links = content.match(/\[\[(.*?)\]\]/g)?.map(link => link.slice(2, -2)) || [];
+            const tags = content.match(/#[^\s#]+/g) || [];
+            const embeds = content.match(/!\[\[(.*?)\]\]/g)?.map(embed => embed.slice(3, -2)) || [];
+            return { links, tags, embeds };
+        };
+
+        // Méthodes de gestion des événements
+        this.editor.on('change', () => {
+            this.trigger('content-changed');
+        });
+
+        // Méthodes de gestion des processeurs markdown
+        this.registerMarkdownPostProcessor = (processor: (el: HTMLElement) => void | Promise<void>) => {
+            this.previewMode.registerProcessor(processor);
+        };
+
+        this.getViewData = () => {
+            return this.editor.getValue();
+        };
     }
 
     showSearch(): void {
@@ -83,41 +136,8 @@ export class MarkdownView extends BaseMarkdownView {
         return 'document';
     }
 
-    getMode(): MarkdownViewModeType {
-        return (this.getState()?.mode || 'source') as MarkdownViewModeType;
-    }
-
-    getViewData(): string {
-        return this.editor.getValue();
-    }
-
-    setViewData(data: string, clear: boolean): void {
-        if (clear) {
-            this.editor.setValue(data);
-        }
-        this.editor.refresh();
-    }
-
     get sourcePath(): string {
         return this.file?.path || '';
-    }
-
-    setMode(mode: MarkdownViewModeType): void {
-        const state = this.getState() || {
-            mode: 'source' as MarkdownViewModeType,
-            source: false,
-            history: false
-        };
-        state.mode = mode;
-        this.setState(state, { history: false });
-    }
-
-    showPreview(): void {
-        this.setMode('preview');
-    }
-
-    showEdit(): void {
-        this.setMode('source');
     }
 
     onPaneMenu(menu: Menu, source: string): void {
@@ -126,9 +146,11 @@ export class MarkdownView extends BaseMarkdownView {
         });
     }
 
-    toggleSourceAndPreview(): void {
-        const currentMode = this.getMode();
-        const newMode = currentMode === 'source' ? 'preview' : 'source';
-        this.setMode(newMode);
+    createInternalLink(path: string): string {
+        return `[[${path}]]`;
+    }
+
+    resolveLink(path: string): { path: string } {
+        return { path };
     }
 }

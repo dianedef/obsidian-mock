@@ -28,8 +28,9 @@ export abstract class TAbstractFile {
 
     constructor(vault: Vault, path: string, parent: TFolder | null = null) {
         this.vault = vault;
-        this.path = path;
-        this.name = path.split('/').pop() || '';
+        this.path = typeof path === 'string' ? path : String(path);
+        const normalizedPath = this.path.replace(/\\/g, '/');
+        this.name = normalizedPath.split('/').pop() || '';
         this.parent = parent;
     }
 } 

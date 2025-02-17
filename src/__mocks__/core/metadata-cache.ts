@@ -14,7 +14,7 @@ import type {
     SectionCache
 } from 'obsidian';
 
-export class MockMetadataCache implements IMetadataCache {
+export class MetadataCache implements IMetadataCache {
     private fileCache: Map<string, CachedMetadata> = new Map();
     resolvedLinks: Map<string, Record<string, number>> = new Map();
     unresolvedLinks: Map<string, Record<string, number>> = new Map();

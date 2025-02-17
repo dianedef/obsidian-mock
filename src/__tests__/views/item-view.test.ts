@@ -1,29 +1,32 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { App } from '../../__mocks__/core/app';
 import { ItemView } from '../../__mocks__/views/item-view';
-import { WorkspaceLeaf } from '../../__mocks__/views/workspace-leaf';
+import { WorkspaceLeaf } from '../../__mocks__/core/workspace-leaf';
 import { WorkspaceTabs } from '../../__mocks__/core/workspace-items';
-import type { App as IApp } from 'obsidian';
+
+interface ViewEvent {
+    isVisible?: boolean;
+    path?: string;
+}
 
 describe('ItemView', () => {
-    let app: IApp;
+    let app: App;
     let parent: WorkspaceTabs;
     let leaf: WorkspaceLeaf;
     let view: ItemView;
 
     beforeEach(() => {
         app = new App();
-        parent = new WorkspaceTabs(null);
+        parent = new WorkspaceTabs(null, app);
         leaf = new WorkspaceLeaf(app, parent);
         view = new ItemView(leaf);
     });
 
-    describe('Constructeur', () => {
-        it('devrait initialiser correctement les propriétés de base', () => {
+    describe('Constructor', () => {
+        it('should correctly initialize base properties', () => {
             expect(view.app).toBe(app);
             expect(view.leaf).toBe(leaf);
             expect(view.containerEl).toBeInstanceOf(HTMLElement);
-            expect(view.contentEl).toBeInstanceOf(HTMLElement);
             expect(view.icon).toBe('document');
             expect(view.navigation).toBe(true);
             expect(view.scope).toBeDefined();
@@ -31,22 +34,22 @@ describe('ItemView', () => {
             expect(view.scope.unregister).toBeDefined();
         });
 
-        it('devrait ajouter contentEl à containerEl', () => {
+        it('should add contentEl to containerEl', () => {
             expect(view.containerEl.contains(view.contentEl)).toBe(true);
         });
     });
 
-    describe('Méthodes de vue', () => {
-        it('devrait avoir des méthodes getViewType et getDisplayText fonctionnelles', () => {
+    describe('View methods', () => {
+        it('should have functional getViewType and getDisplayText methods', () => {
             expect(view.getViewType()).toBe('item-view');
             expect(view.getDisplayText()).toBe('Item View');
         });
 
-        it('devrait avoir une méthode getIcon fonctionnelle', () => {
+        it('should have a functional getIcon method', () => {
             expect(view.getIcon()).toBe('document');
         });
 
-        it('devrait avoir des méthodes de gestion d\'état fonctionnelles', () => {
+        it('should have functional state management methods', () => {
             const state = { test: 'value' };
             view.setState(state, { history: [] });
             expect(view.getState()).toEqual({});
@@ -54,8 +57,8 @@ describe('ItemView', () => {
         });
     });
 
-    describe('Méthodes spécifiques', () => {
-        it('devrait avoir une méthode addAction fonctionnelle', () => {
+    describe('Specific methods', () => {
+        it('should have a functional addAction method', () => {
             const icon = 'test-icon';
             const title = 'Test Action';
             const callback = () => {};
@@ -65,7 +68,7 @@ describe('ItemView', () => {
             expect(view.addAction).toHaveBeenCalledWith(icon, title, callback);
         });
 
-        it('devrait avoir une méthode then fonctionnelle', () => {
+        it('should have a functional then method', () => {
             const resolve = () => {};
             const result = view.then(resolve);
             expect(result).toBe(view);
@@ -73,18 +76,12 @@ describe('ItemView', () => {
         });
     });
 
-    describe('Méthodes de cycle de vie', () => {
-        it('devrait avoir des méthodes de cycle de vie fonctionnelles', async () => {
-            await view.onOpen();
-            expect(view.onOpen).toHaveBeenCalled();
-
-            await view.onClose();
-            expect(view.onClose).toHaveBeenCalled();
-
-            view.load();
+    describe('Lifecycle methods', () => {
+        it('should have functional lifecycle methods', async () => {
+            await view.load();
             expect(view.load).toHaveBeenCalled();
 
-            view.unload();
+            await view.unload();
             expect(view.unload).toHaveBeenCalled();
 
             view.onload();
@@ -95,8 +92,8 @@ describe('ItemView', () => {
         });
     });
 
-    describe('Méthodes de composant', () => {
-        it('devrait avoir des méthodes de gestion des enfants fonctionnelles', () => {
+    describe('Component methods', () => {
+        it('should have functional child management methods', () => {
             const child = { type: 'test-child' };
             const result = view.addChild(child);
             expect(result).toBe(child);
@@ -107,7 +104,7 @@ describe('ItemView', () => {
             expect(view.removeChild).toHaveBeenCalledWith(child);
         });
 
-        it('devrait avoir des méthodes d\'enregistrement fonctionnelles', () => {
+        it('should have functional registration methods', () => {
             const callback = () => {};
             view.register(callback);
             expect(view.register).toHaveBeenCalledWith(callback);
@@ -126,6 +123,46 @@ describe('ItemView', () => {
             const result = view.registerInterval(interval);
             expect(result).toBe(0);
             expect(view.registerInterval).toHaveBeenCalledWith(interval);
+        });
+    });
+
+    describe('DOM management', () => {
+        it('should be able to create elements with attributes', () => {
+            const el = document.createElement('div');
+            el.className = 'test-class';
+            el.setAttribute('data-test', 'value');
+            el.textContent = 'Test content';
+            view.containerEl.appendChild(el);
+
+            expect(el.classList.contains('test-class')).toBe(true);
+            expect(el.getAttribute('data-test')).toBe('value');
+            expect(el.textContent).toBe('Test content');
+        });
+
+        it('should be able to manipulate element hierarchy', () => {
+            const parent = document.createElement('div');
+            const child1 = document.createElement('span');
+            const child2 = document.createElement('span');
+
+            parent.appendChild(child1);
+            parent.appendChild(child2);
+            
+            expect(parent.children.length).toBe(2);
+            expect(parent.contains(child1)).toBe(true);
+            expect(parent.contains(child2)).toBe(true);
+        });
+
+        it('should be able to dynamically manage styles', () => {
+            const el = document.createElement('div');
+            Object.assign(el.style, {
+                backgroundColor: 'red',
+                fontSize: '16px',
+                display: 'flex'
+            });
+
+            expect(el.style.backgroundColor).toBe('red');
+            expect(el.style.fontSize).toBe('16px');
+            expect(el.style.display).toBe('flex');
         });
     });
 }); 

@@ -1,9 +1,15 @@
 import { vi } from 'vitest';
 import type { TextComponent } from 'obsidian';
-import { MockComponent } from './component';
+import { Component } from './component';
 
-export class MockMomentFormatComponent extends MockComponent implements TextComponent {
-    inputEl: HTMLInputElement;
+export class MomentFormatComponent extends Component implements TextComponent {
+    containerEl: HTMLElement = document.createElement('div');
+    inputEl: HTMLInputElement = document.createElement('input');
+    
+    getValue = vi.fn().mockReturnValue('');
+    setValue = vi.fn();
+    onChanged = vi.fn();
+
     sampleEl: HTMLElement;
     disabled: boolean = false;
     private defaultFormat: string = 'YYYY-MM-DD';
@@ -13,7 +19,6 @@ export class MockMomentFormatComponent extends MockComponent implements TextComp
 
     constructor() {
         super();
-        this.inputEl = document.createElement('input');
         this.inputEl.type = 'text';
         this.inputEl.placeholder = this.defaultFormat;
 
@@ -45,17 +50,6 @@ export class MockMomentFormatComponent extends MockComponent implements TextComp
         return this;
     }
 
-    getValue(): string {
-        return this.value;
-    }
-
-    setValue(value: string): this {
-        this.value = value;
-        this.inputEl.value = value;
-        this.updateSample();
-        return this;
-    }
-
     setDisabled(disabled: boolean): this {
         this.disabled = disabled;
         this.inputEl.disabled = disabled;
@@ -65,10 +59,6 @@ export class MockMomentFormatComponent extends MockComponent implements TextComp
     setPlaceholder(placeholder: string): this {
         this.inputEl.placeholder = placeholder;
         return this;
-    }
-
-    onChanged(): void {
-        this.updateSample();
     }
 
     onChange(callback: (value: string) => any): this {

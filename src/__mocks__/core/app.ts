@@ -1,42 +1,53 @@
-import { App, Events } from 'obsidian';
-import { Workspace } from '../../core/workspace';
+import { vi } from 'vitest';
+import type { App as IApp, Scope as IScope, Keymap as IKeymap, Workspace as IWorkspace, Vault as IVault, MetadataCache as IMetadataCache, FileManager as IFileManager } from 'obsidian';
+import { Workspace } from './workspace';
 import { Vault } from './vault';
-import { MockMetadataCache } from './metadata-cache';
+import { MetadataCache } from './metadata-cache';
 import { FileManager } from './file-manager';
 import { Keymap } from './keymap';
 import { Scope } from './scope';
 import { Commands } from './commands';
 
-export class MockApp extends Events implements App {
-    workspace: Workspace;
-    vault: Vault;
-    metadataCache: MockMetadataCache;
-    fileManager: FileManager;
+export class App implements IApp {
+    keymap: IKeymap;
+    scope: IScope;
+    workspace: IWorkspace;
+    vault: IVault;
+    metadataCache: IMetadataCache;
+    fileManager: IFileManager;
     commands: Commands;
-    keymap: Keymap;
-    scope: Scope;
-    plugins: Record<string, any>;
-    lastEvent: MouseEvent | KeyboardEvent | null = null;
+    settings: any;
+    plugins: any;
+    lastEvent: any;
 
     constructor() {
-        super();
         this.workspace = new Workspace(this);
         this.vault = new Vault();
-        this.metadataCache = new MockMetadataCache();
-        this.fileManager = new FileManager();
+        this.metadataCache = new MetadataCache();
+        this.fileManager = new FileManager(this);
         this.commands = new Commands();
         this.keymap = new Keymap();
         this.scope = new Scope();
-        this.plugins = {};
+        this.settings = {
+            on: vi.fn(),
+            off: vi.fn(),
+            get: vi.fn(),
+            set: vi.fn(),
+            clear: vi.fn(),
+        };
+        this.plugins = {
+            manifests: {},
+            plugins: {},
+            enablePlugin: vi.fn(),
+            disablePlugin: vi.fn(),
+        };
+        this.lastEvent = null;
     }
 
-    loadProgress(): {
-        setMessage: (message: string) => void;
-        finish: () => void;
-    } {
+    loadProgress(): { setMessage: (message: string) => void; finish: () => void; } {
         return {
-            setMessage: () => {},
-            finish: () => {}
+            setMessage: vi.fn(),
+            finish: vi.fn()
         };
     }
 
@@ -150,5 +161,4 @@ export class MockApp extends Events implements App {
 }
 
 // Export une instance par défaut pour les tests
-export { MockApp as App };
-export const app = new MockApp();
+export const app = new App();

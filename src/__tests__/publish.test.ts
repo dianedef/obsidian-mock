@@ -71,14 +71,14 @@ describe('Publish', () => {
             };
             const processor = publish.registerMarkdownCodeBlockProcessor('test', handler);
             
-            // Simuler un bloc de code
+            // Simulate a code block
             const el = document.createElement('div');
             const pre = el.appendChild(document.createElement('pre'));
             const code = pre.appendChild(document.createElement('code'));
             code.classList.add('language-test');
             code.textContent = 'test content';
 
-            // Tester le processeur
+            // Test the processor
             await processor(el, {
                 docId: 'test',
                 sourcePath: 'test.md',
@@ -87,7 +87,7 @@ describe('Publish', () => {
                 getSectionInfo: () => null
             });
 
-            // Vérifier que le pre a été remplacé par un div avec le contenu
+            // Verify that the pre has been replaced by a div with the content
             expect(el.querySelector('pre')).toBeNull();
             const wrapper = el.querySelector('div');
             expect(wrapper).not.toBeNull();

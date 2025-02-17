@@ -1,14 +1,16 @@
 import { vi } from 'vitest';
-import type { DataAdapter } from 'obsidian';
-import { MockDataAdapter } from './data-adapter';
+import type { DataAdapter as IDataAdapter } from 'obsidian';
+import { DataAdapter } from './data-adapter';
+
 
 /**
  * Implementation of the vault adapter for mobile devices.
  * @public
  */
-export class MockCapacitorAdapter extends MockDataAdapter implements DataAdapter {
+export class CapacitorAdapter extends DataAdapter implements IDataAdapter {
     /**
      * @public
+
      */
     getName(): string {
         return 'mock-capacitor-adapter';

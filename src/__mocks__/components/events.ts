@@ -1,66 +1,74 @@
-import type { Events as IEvents, TFile, WorkspaceLeaf, EventRef, WorkspaceEventCallbacks } from 'obsidian';
+import { vi } from 'vitest';
+import type { Events as IEvents } from 'obsidian';
+
+export interface IEventRef {
+    unregister: () => void;
+}
 
 export class Events implements IEvents {
-    private eventRefs: Map<string, Set<{ callback: Function; ctx?: any; id: string }>> = new Map();
-    private nextEventId = 1;
+    protected events: Map<string, Set<Function>>;
+    protected loaded: boolean;
 
-    on<K extends keyof WorkspaceEventCallbacks>(
-        name: K,
-        callback: WorkspaceEventCallbacks[K],
-        ctx?: any
-    ): EventRef {
-        if (!this.eventRefs.has(name)) {
-            this.eventRefs.set(name, new Set());
-        }
-        const eventSet = this.eventRefs.get(name)!;
-        const id = `evt_${this.nextEventId++}`;
-        const ref = { callback, ctx, id };
-        eventSet.add(ref);
-        return { id };
+    constructor() {
+        this.events = new Map();
+        this.loaded = true;
     }
 
-    off<K extends keyof WorkspaceEventCallbacks>(
-        name: K,
-        callback: WorkspaceEventCallbacks[K]
-    ): void {
-        const eventSet = this.eventRefs.get(name);
-        if (eventSet) {
-            for (const ref of eventSet) {
-                if (ref.callback === callback) {
-                    eventSet.delete(ref);
-                    break;
+    on(name: string, callback: Function, ctx?: any): IEventRef {
+        if (!this.events.has(name)) {
+            this.events.set(name, new Set());
+        }
+        const boundCallback = ctx ? callback.bind(ctx) : callback;
+        this.events.get(name)?.add(boundCallback);
+        
+        return {
+            unregister: () => {
+                this.events.get(name)?.delete(boundCallback);
+            }
+        };
+    }
+
+    off(name: string, callback: Function): void {
+        this.events.get(name)?.delete(callback);
+    }
+
+    offref(ref: IEventRef): void {
+        if (ref && typeof ref.unregister === 'function') {
+            ref.unregister();
+        }
+    }
+
+    trigger(name: string, ...args: any[]): void {
+        const callbacks = this.events.get(name);
+        if (callbacks) {
+            for (const callback of callbacks) {
+                try {
+                    callback(...args);
+                } catch (e) {
+                    console.error(`Error triggering event ${name}:`, e);
                 }
             }
         }
     }
 
-    offref(ref: EventRef): void {
-        for (const eventSet of this.eventRefs.values()) {
-            for (const eventRef of eventSet) {
-                if (eventRef.id === ref.id) {
-                    eventSet.delete(eventRef);
-                    return;
-                }
+    tryTrigger(evt: IEventRef, args: any[]): void {
+        if (evt && typeof evt.unregister === 'function') {
+            try {
+                evt.unregister();
+            } catch (e) {
+                console.error('Error unregistering event:', e);
             }
         }
     }
 
-    trigger<K extends keyof WorkspaceEventCallbacks>(
-        name: K,
-        ...args: Parameters<WorkspaceEventCallbacks[K]>
-    ): void {
-        const eventSet = this.eventRefs.get(name);
-        if (eventSet) {
-            for (const { callback, ctx } of eventSet) {
-                callback.apply(ctx, args);
-            }
-        }
+    load(): void {
+        this.loaded = true;
+        this.trigger('load');
     }
 
-    tryTrigger<K extends keyof WorkspaceEventCallbacks>(
-        name: K,
-        ...args: Parameters<WorkspaceEventCallbacks[K]>
-    ): void {
-        this.trigger(name, ...args);
+    unload(): void {
+        this.trigger('unload');
+        this.loaded = false;
+        this.events.clear();
     }
 } 

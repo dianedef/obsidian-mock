@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
-import type { CloseableComponent } from 'obsidian';
+import type { CloseableComponent as ICloseableComponent } from 'obsidian';
 
-export class MockCloseableComponent implements CloseableComponent {
+export class CloseableComponent implements ICloseableComponent {
     close = vi.fn();
 } 

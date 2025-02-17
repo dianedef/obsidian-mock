@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { App as AppImpl } from '../../__mocks__/core/app';
-import { View } from '../../__mocks__/views/view';
+import { View } from '../../__mocks__/core/view';
 import { WorkspaceLeaf } from '../../__mocks__/views/workspace-leaf';
 import { WorkspaceTabs } from '../../__mocks__/core/workspace-items';
 import type { App } from 'obsidian';
 
-// Classe de test qui expose les méthodes protégées
+// Test class that exposes protected methods
 class TestView extends View {
     public async testOnOpen(): Promise<void> {
         return this.onOpen();
@@ -29,8 +29,8 @@ describe('View', () => {
         view = new TestView(leaf);
     });
 
-    describe('Constructeur', () => {
-        it('devrait initialiser correctement les propriétés de base', () => {
+    describe('Constructor', () => {
+        it('should correctly initialize base properties', () => {
             expect(view.app).toBe(app);
             expect(view.leaf).toBe(leaf);
             expect(view.containerEl).toBeInstanceOf(HTMLElement);
@@ -42,18 +42,18 @@ describe('View', () => {
         });
     });
 
-    describe('Méthodes de vue', () => {
-        it('devrait avoir des méthodes getViewType et getDisplayText fonctionnelles', () => {
+    describe('View methods', () => {
+        it('should have functional getViewType and getDisplayText methods', () => {
             expect(view.getViewType()).toBe('view');
             expect(view.getDisplayText()).toBe('View');
         });
 
-        it('devrait avoir une méthode getIcon fonctionnelle', () => {
+        it('should have a functional getIcon method', () => {
             view.icon = 'test-icon';
             expect(view.getIcon()).toBe('test-icon');
         });
 
-        it('devrait avoir des méthodes de gestion d\'état fonctionnelles', () => {
+        it('should have functional state management methods', () => {
             const state = { test: 'value' };
             const result = { history: true };
             view.setState(state, result);
@@ -63,8 +63,8 @@ describe('View', () => {
         });
     });
 
-    describe('Méthodes de cycle de vie', () => {
-        it('devrait appeler onOpen et onClose', async () => {
+    describe('Lifecycle methods', () => {
+        it('should call onOpen and onClose', async () => {
             await view.testOnOpen();
             expect(view.onOpen).toHaveBeenCalled();
 
@@ -72,7 +72,7 @@ describe('View', () => {
             expect(view.onClose).toHaveBeenCalled();
         });
 
-        it('devrait avoir des méthodes de cycle de vie fonctionnelles', async () => {
+        it('should have functional lifecycle methods', async () => {
             await view.onOpen();
             expect(view.onOpen).toHaveBeenCalled();
 
@@ -93,8 +93,8 @@ describe('View', () => {
         });
     });
 
-    describe('Méthodes de composant', () => {
-        it('devrait avoir des méthodes de gestion des enfants fonctionnelles', () => {
+    describe('Component methods', () => {
+        it('should have functional child management methods', () => {
             const child = { type: 'test-child' };
             const result = view.addChild(child);
             expect(result).toBe(child);
@@ -105,7 +105,7 @@ describe('View', () => {
             expect(view.removeChild).toHaveBeenCalledWith(child);
         });
 
-        it('devrait avoir des méthodes d\'enregistrement fonctionnelles', () => {
+        it('should have functional registration methods', () => {
             const callback = () => {};
             view.register(callback);
             expect(view.register).toHaveBeenCalledWith(callback);

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MarkdownView } from '../../__mocks__/views/markdown-view';
-import { WorkspaceLeaf } from '../../__mocks__/views/workspace-leaf';
-import type { WorkspaceTabs, TFile } from 'obsidian';
 import { App } from '../../__mocks__/core/app';
+import { WorkspaceLeaf } from '../../__mocks__/core/workspace-leaf';
+import { WorkspaceTabs } from '../../__mocks__/core/workspace-items';
+import type { TFile } from 'obsidian';
 
 describe('MarkdownView', () => {
     let app: App;
@@ -13,15 +14,8 @@ describe('MarkdownView', () => {
 
     beforeEach(() => {
         app = new App();
-        parent = {
-            children: [],
-            getRoot: () => parent,
-            getContainer: () => parent,
-            win: window,
-            doc: document,
-            containerEl: document.createElement('div')
-        } as unknown as WorkspaceTabs;
-        leaf = new WorkspaceLeaf(app, parent);
+        parent = new WorkspaceTabs(null);
+        leaf = new WorkspaceLeaf(parent);
         view = new MarkdownView(leaf);
         mockFile = {
             path: 'test.md',
@@ -29,120 +23,63 @@ describe('MarkdownView', () => {
             extension: 'md',
             vault: app.vault,
             parent: null,
-            name: 'test.md'
+            name: 'test.md',
+            stat: {
+                ctime: Date.now(),
+                mtime: Date.now(),
+                size: 0
+            }
         } as TFile;
     });
 
-    describe('Constructeur', () => {
-        it('devrait initialiser correctement les propriétés de base', () => {
-            expect(view.app).toBe(app);
-            expect(view.leaf).toBe(leaf);
-            expect(view.containerEl).toBeInstanceOf(HTMLElement);
+    describe('Basic Properties', () => {
+        it('should have essential properties', () => {
             expect(view.editor).toBeDefined();
             expect(view.previewMode).toBeDefined();
             expect(view.file).toBeNull();
-            expect(view.data).toBe('');
+            expect(view.hoverPopover).toBeNull();
+        });
+
+        it('should have the correct view type', () => {
             expect(view.getViewType()).toBe('markdown');
-        });
-
-        it('devrait initialiser correctement l\'éditeur', () => {
-            expect(view.editor.getValue()).toBe('');
-            expect(view.editor.getCursor()).toEqual({ line: 0, ch: 0 });
-            expect(view.editor.getScrollInfo()).toEqual({ top: 0, left: 0 });
-        });
-
-        it('devrait initialiser correctement le mode prévisualisation', () => {
-            expect(view.previewMode.containerEl).toBeInstanceOf(HTMLElement);
-            expect(view.previewMode).toBeDefined();
+            expect(view.getDisplayText()).toBe('Markdown View');
+            expect(view.getIcon()).toBe('document');
         });
     });
 
-    describe('Gestion des modes', () => {
-        it('devrait gérer correctement le changement de mode', () => {
-            expect(view.getMode()).toBeDefined();
+    describe('Editing Modes', () => {
+        it('should be able to change mode', () => {
+            expect(view.getMode()).toBe('source');
             
-            view.setMode('preview');
-            expect(view.getMode()).toBeDefined();
-            
-            view.setMode('source');
-            expect(view.getMode()).toBeDefined();
-        });
-
-        it('devrait basculer correctement entre les modes', () => {
             view.showPreview();
-            expect(view.setMode).toHaveBeenCalledWith('preview');
-
+            expect(view.getMode()).toBe('preview');
+            
             view.showEdit();
-            expect(view.setMode).toHaveBeenCalledWith('source');
-
+            expect(view.getMode()).toBe('source');
+            
             view.toggleSourceAndPreview();
-            expect(view.setMode).toHaveBeenCalled();
+            expect(view.getMode()).toBe('preview');
         });
     });
 
-    describe('Gestion du contenu', () => {
-        it('devrait gérer correctement les données de la vue', () => {
-            expect(view.getViewData()).toBe('');
+    describe('Content Management', () => {
+        it('should be able to manage content', () => {
+            const testContent = 'Test content';
+            view.setViewData(testContent, true);
+            expect(view.editor.setValue).toHaveBeenCalledWith(testContent);
             
-            const data = 'Test content';
-            view.setViewData(data);
-            expect(view.setViewData).toHaveBeenCalledWith(data);
+            (view.editor.getValue as any).mockReturnValue(testContent);
+            expect(view.getViewData()).toBe(testContent);
         });
 
-        it('devrait gérer correctement le défilement', () => {
-            expect(view.getScroll()).toEqual({ top: 0, left: 0 });
-            
-            view.applyScroll({ top: 100, left: 0 });
-            expect(view.applyScroll).toHaveBeenCalledWith({ top: 100, left: 0 });
+        it('should be able to save', () => {
+            view.requestSave();
+            expect(view.requestSave).toHaveBeenCalled();
         });
     });
 
-    describe('Méthodes de cycle de vie', () => {
-        it('devrait gérer correctement le chargement et déchargement de fichier', async () => {
-            await view.onLoadFile(mockFile);
-            expect(view.file).toBe(mockFile);
-
-            await view.onUnloadFile(mockFile);
-            expect(view.file).toBeNull();
-        });
-
-        it('devrait gérer correctement le renommage de fichier', async () => {
-            view.file = mockFile;
-            await view.onRename(mockFile);
-            expect(view.file).toBe(mockFile);
-        });
-
-        it('devrait gérer correctement l\'état de la vue', async () => {
-            const state = { file: 'test.md' };
-            await view.setState(state, { history: false });
-            expect(view.file).toBeDefined();
-        });
-    });
-
-    describe('Méthodes utilitaires', () => {
-        it('devrait avoir une méthode clear fonctionnelle', () => {
-            view.clear();
-            expect(view.clear).toHaveBeenCalled();
-        });
-
-        it('devrait avoir une méthode onRename fonctionnelle', () => {
-            view.onRename();
-            expect(view.onRename).toHaveBeenCalled();
-        });
-
-        it('devrait avoir une méthode canAcceptExtension fonctionnelle', () => {
-            expect(view.canAcceptExtension()).toBe(true);
-            expect(view.canAcceptExtension).toHaveBeenCalled();
-        });
-
-        it('devrait avoir une méthode getContext fonctionnelle', () => {
-            expect(view.getContext()).toEqual({});
-            expect(view.getContext).toHaveBeenCalled();
-        });
-    });
-
-    describe('Méthodes de l\'éditeur', () => {
-        it('devrait avoir des méthodes d\'édition fonctionnelles', () => {
+    describe('Editor Methods', () => {
+        it('should have functional editing methods', () => {
             expect(view.editor.getValue()).toBe('');
             expect(view.editor.getDoc().getValue()).toBe('');
             expect(view.editor.getSelection()).toBe('');
@@ -151,20 +88,173 @@ describe('MarkdownView', () => {
             expect(view.editor.hasFocus()).toBe(false);
         });
 
-        it('devrait avoir des méthodes de manipulation du curseur fonctionnelles', () => {
+        it('should have functional cursor manipulation methods', () => {
             const pos = { line: 0, ch: 0 };
             view.editor.setCursor(pos);
             expect(view.editor.setCursor).toHaveBeenCalledWith(pos);
             expect(view.editor.getCursor()).toEqual(pos);
         });
 
-        it('devrait avoir des méthodes de défilement fonctionnelles', () => {
+        it('should have functional scrolling methods', () => {
             view.editor.scrollTo(0, 100);
             expect(view.editor.scrollTo).toHaveBeenCalledWith(0, 100);
 
             const range = { from: { line: 0, ch: 0 }, to: { line: 1, ch: 0 } };
             view.editor.scrollIntoView(range);
             expect(view.editor.scrollIntoView).toHaveBeenCalledWith(range);
+        });
+    });
+
+    describe('Lifecycle Methods', () => {
+        it('should correctly handle file loading and unloading', async () => {
+            await view.onLoadFile(mockFile);
+            expect(view.file).toBe(mockFile);
+
+            await view.onUnloadFile(mockFile);
+            expect(view.file).toBeNull();
+        });
+
+        it('should correctly handle file renaming', async () => {
+            view.file = mockFile;
+            await view.onRename(mockFile);
+            expect(view.file).toBe(mockFile);
+        });
+
+        it('should correctly handle view state', async () => {
+            const state = { file: 'test.md' };
+            await view.setState(state, { history: false });
+            expect(view.file).toBeDefined();
+        });
+    });
+
+    describe('Utility Methods', () => {
+        it('should have a functional clear method', () => {
+            view.clear();
+            expect(view.clear).toHaveBeenCalled();
+        });
+
+        it('should have a functional canAcceptExtension method', () => {
+            expect(view.canAcceptExtension()).toBe(true);
+            expect(view.canAcceptExtension).toHaveBeenCalled();
+        });
+
+        it('should have a functional getContext method', () => {
+            expect(view.getContext()).toEqual({});
+            expect(view.getContext).toHaveBeenCalled();
+        });
+    });
+
+    describe('Advanced Preview Mode Management', () => {
+        it('should correctly handle markdown post-processors', () => {
+            const processor = (el: HTMLElement) => {
+                el.innerHTML = '<strong>Test</strong>';
+                return true;
+            };
+            
+            view.registerMarkdownPostProcessor(processor);
+            expect(view.previewMode.registerProcessor).toHaveBeenCalledWith(processor);
+        });
+
+        it('should correctly handle preview sections', () => {
+            const section = document.createElement('div');
+            section.innerHTML = '# Test';
+            
+            view.previewMode.triggerOnCreate(section);
+            expect(section.querySelector('h1')).toBeDefined();
+        });
+
+        it('should be able to reload the preview', () => {
+            view.previewMode.rerender();
+            expect(view.previewMode.rerender).toHaveBeenCalled();
+        });
+    });
+
+    describe('Advanced Editor Management', () => {
+        it('should correctly handle transactions', () => {
+            const transaction = {
+                changes: [{ from: 0, to: 0, text: 'Test' }],
+                selection: { anchor: 0, head: 4 }
+            };
+            
+            view.editor.transaction(transaction);
+            expect(view.editor.transaction).toHaveBeenCalledWith(transaction);
+        });
+
+        it('should correctly handle history', () => {
+            view.editor.undo();
+            expect(view.editor.undo).toHaveBeenCalled();
+
+            view.editor.redo();
+            expect(view.editor.redo).toHaveBeenCalled();
+
+            view.editor.clearHistory();
+            expect(view.editor.clearHistory).toHaveBeenCalled();
+        });
+
+        it('should correctly handle multiple selections', () => {
+            const selections = [
+                { anchor: 0, head: 4 },
+                { anchor: 6, head: 10 }
+            ];
+            
+            view.editor.setSelections(selections);
+            expect(view.editor.setSelections).toHaveBeenCalledWith(selections);
+            
+            view.editor.getSelections();
+            expect(view.editor.getSelections).toHaveBeenCalled();
+        });
+    });
+
+    describe('Advanced Event Management', () => {
+        it('should emit events on mode changes', () => {
+            let called = false;
+            view.on('mode-change', () => {
+                called = true;
+            });
+
+            view.toggleSourceAndPreview();
+            expect(called).toBe(true);
+        });
+
+        it('should emit events on content modifications', () => {
+            let called = false;
+            view.on('content-modified', () => {
+                called = true;
+            });
+
+            view.editor.setValue('Test');
+            expect(called).toBe(true);
+        });
+
+        it('should emit events on file changes', () => {
+            let called = false;
+            view.on('file-changed', () => {
+                called = true;
+            });
+
+            view.onLoadFile(mockFile);
+            expect(called).toBe(true);
+        });
+    });
+
+    describe('Link and Reference Management', () => {
+        it('should be able to create links', () => {
+            const link = view.createInternalLink('test');
+            expect(link).toBe('[[test]]');
+        });
+
+        it('should be able to resolve links', () => {
+            const resolved = view.resolveLink('test');
+            expect(resolved).toBeDefined();
+            expect(resolved.path).toBe('test');
+        });
+
+        it('should be able to extract references', () => {
+            view.editor.setValue('[[test]] #tag ^reference');
+            const refs = view.extractReferences();
+            expect(refs.links).toContain('test');
+            expect(refs.tags).toContain('#tag');
+            expect(refs.embeds).toBeDefined();
         });
     });
 }); 

@@ -1,22 +1,13 @@
 import { vi } from 'vitest';
-import type { SettingTab as ISettingTab } from 'obsidian';
-import { Events } from '../components/events';
+import type { App, Plugin } from 'obsidian';
 
-export class SettingTab extends Events implements ISettingTab {
-    app: any;
+export class PluginSettingTab {
     containerEl: HTMLElement;
 
-    constructor(app: any, containerEl: HTMLElement) {
-        super();
-        this.app = app;
-        this.containerEl = containerEl;
+    constructor(public app: App, public plugin: Plugin) {
+        this.containerEl = document.createElement('div');
     }
 
-    display(): void {
-        this.containerEl.empty();
-    }
-
-    hide(): void {
-        this.containerEl.empty();
-    }
+    display = vi.fn();
+    hide = vi.fn();
 } 

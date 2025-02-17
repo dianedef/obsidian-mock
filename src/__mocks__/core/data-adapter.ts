@@ -1,13 +1,14 @@
 import { vi } from 'vitest';
-import type { DataAdapter, DataWriteOptions, ListedFiles, Stat } from 'obsidian';
+import type { DataAdapter as IDataAdapter, DataWriteOptions, ListedFiles, Stat } from 'obsidian';
 
 /**
  * Mock de base pour l'interface DataAdapter
  * @public
  */
-export class MockDataAdapter implements DataAdapter {
+export class DataAdapter implements IDataAdapter {
     private files: Map<string, string> = new Map();
     private folders: Set<string> = new Set();
+
 
     // Base methods
     getName = vi.fn().mockReturnValue('mock-data-adapter');

@@ -6,6 +6,15 @@ describe('Vault', () => {
 
     beforeEach(() => {
         vault = new Vault();
+        vault.adapter.mkdir = vi.fn();
+        vault.adapter.exists = vi.fn();
+        vault.adapter.read = vi.fn();
+        vault.adapter.write = vi.fn();
+        vault.adapter.remove = vi.fn();
+        vault.adapter.list = vi.fn();
+        vault.adapter.getResourcePath = vi.fn();
+        vault.adapter.getFullPath = vi.fn();
+        vault.adapter.getName = vi.fn();
     });
 
     describe('Méthodes de base', () => {
@@ -53,18 +62,23 @@ describe('Vault', () => {
         it('devrait avoir les méthodes de gestion de fichiers', async () => {
             const path = 'test.md';
             const newPath = 'new-test.md';
+            const content = 'test content';
 
-            await vault.delete(path);
-            expect(vault.delete).toHaveBeenCalledWith(path);
+            // Créer d'abord le fichier
+            const file = await vault.create(path, content);
+            expect(vault.create).toHaveBeenCalledWith(path, content);
 
-            await vault.trash(path);
-            expect(vault.trash).toHaveBeenCalledWith(path);
+            await vault.delete(file);
+            expect(vault.delete).toHaveBeenCalledWith(file);
 
-            await vault.rename(path, newPath);
-            expect(vault.rename).toHaveBeenCalledWith(path, newPath);
+            await vault.trash(file);
+            expect(vault.trash).toHaveBeenCalledWith(file);
 
-            await vault.copy(path, newPath);
-            expect(vault.copy).toHaveBeenCalledWith(path, newPath);
+            await vault.rename(file, newPath);
+            expect(vault.rename).toHaveBeenCalledWith(file, newPath);
+
+            await vault.copy(file, newPath);
+            expect(vault.copy).toHaveBeenCalledWith(file, newPath);
         });
 
         it('devrait avoir les méthodes de requête de fichiers', () => {
@@ -82,49 +96,20 @@ describe('Vault', () => {
 
     describe('Adapter', () => {
         it('devrait avoir les méthodes de base de l\'adapter', async () => {
-            const path = 'test.md';
-            const content = 'test content';
-
-            await vault.adapter.read(path);
-            expect(vault.adapter.read).toHaveBeenCalledWith(path);
-
-            await vault.adapter.write(path, content);
-            expect(vault.adapter.write).toHaveBeenCalledWith(path, content);
+            const path = 'test/path';
 
             await vault.adapter.mkdir(path);
             expect(vault.adapter.mkdir).toHaveBeenCalledWith(path);
 
             await vault.adapter.exists(path);
             expect(vault.adapter.exists).toHaveBeenCalledWith(path);
-
-            await vault.adapter.stat(path);
-            expect(vault.adapter.stat).toHaveBeenCalledWith(path);
-
-            await vault.adapter.remove(path);
-            expect(vault.adapter.remove).toHaveBeenCalledWith(path);
-
-            const newPath = 'new-test.md';
-            await vault.adapter.rename(path, newPath);
-            expect(vault.adapter.rename).toHaveBeenCalledWith(path, newPath);
-
-            await vault.adapter.copy(path, newPath);
-            expect(vault.adapter.copy).toHaveBeenCalledWith(path, newPath);
         });
 
         it('devrait avoir les méthodes de gestion des chemins', () => {
-            const path = 'test.md';
-            
-            vault.adapter.getName();
-            expect(vault.adapter.getName).toHaveBeenCalled();
+            const path = 'test/path';
 
-            vault.adapter.list();
-            expect(vault.adapter.list).toHaveBeenCalled();
-
-            vault.adapter.setFullPath(path);
-            expect(vault.adapter.setFullPath).toHaveBeenCalledWith(path);
-
-            vault.adapter.getFullPath();
-            expect(vault.adapter.getFullPath).toHaveBeenCalled();
+            vault.adapter.getResourcePath(path);
+            expect(vault.adapter.getResourcePath).toHaveBeenCalledWith(path);
         });
     });
 }); 

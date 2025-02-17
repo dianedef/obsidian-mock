@@ -1,3 +1,6 @@
 /afr
 /czecez.md
 /node_modules
+/dist
+.aider*
+.env

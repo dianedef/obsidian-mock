@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExtraButtonComponent } from '../../__mocks__/ui/extra-button-component';
 import '../helpers/dom-extensions';
 
-// Extension de HTMLElement pour simuler les méthodes d'Obsidian
+// Extension of HTMLElement to simulate Obsidian methods
 declare global {
     interface HTMLElement {
         createDiv(className?: string): HTMLDivElement;
     }
 }
 
-// Implémentation de createDiv
+// Implementation of createDiv
 HTMLElement.prototype.createDiv = function(className?: string): HTMLDivElement {
     const div = document.createElement('div');
     if (className) {
@@ -28,8 +28,8 @@ describe('ExtraButtonComponent', () => {
         component = new ExtraButtonComponent(containerEl);
     });
 
-    describe('Constructeur', () => {
-        it('devrait créer un élément extraSettingsEl avec la classe appropriée', () => {
+    describe('Constructor', () => {
+        it('should create an extraSettingsEl element with the appropriate class', () => {
             expect(component.extraSettingsEl).toBeInstanceOf(HTMLElement);
             expect(component.extraSettingsEl.classList.contains('extra-settings-button')).toBe(true);
             expect(containerEl.contains(component.extraSettingsEl)).toBe(true);
@@ -37,7 +37,7 @@ describe('ExtraButtonComponent', () => {
     });
 
     describe('setDisabled', () => {
-        it('devrait mettre à jour la propriété disabled et ajouter/supprimer la classe appropriée', () => {
+        it('should update the disabled property and add/remove the appropriate class', () => {
             component.setDisabled(true);
             expect(component.disabled).toBe(true);
             expect(component.extraSettingsEl.classList.contains('is-disabled')).toBe(true);
@@ -47,25 +47,25 @@ describe('ExtraButtonComponent', () => {
             expect(component.extraSettingsEl.classList.contains('is-disabled')).toBe(false);
         });
 
-        it('devrait retourner this pour le chaînage', () => {
+        it('should return this for chaining', () => {
             const result = component.setDisabled(true);
             expect(result).toBe(component);
         });
     });
 
     describe('setTooltip', () => {
-        it('devrait définir l\'attribut aria-label', () => {
+        it('should set the aria-label attribute', () => {
             const tooltip = 'Test tooltip';
             component.setTooltip(tooltip);
             expect(component.extraSettingsEl.getAttribute('aria-label')).toBe(tooltip);
         });
 
-        it('devrait retourner this pour le chaînage', () => {
+        it('should return this for chaining', () => {
             const result = component.setTooltip('test');
             expect(result).toBe(component);
         });
 
-        it('devrait gérer les options de tooltip', () => {
+        it('should handle tooltip options', () => {
             const tooltip = 'Test tooltip';
             const options = { delay: 300 };
             component.setTooltip(tooltip, options);
@@ -74,24 +74,24 @@ describe('ExtraButtonComponent', () => {
     });
 
     describe('setIcon', () => {
-        it('devrait ajouter la classe d\'icône appropriée', () => {
+        it('should add the appropriate icon class', () => {
             const icon = 'settings';
             component.setIcon(icon);
             expect(component.extraSettingsEl.classList.contains(`${icon}-icon`)).toBe(true);
         });
 
-        it('devrait retourner this pour le chaînage', () => {
+        it('should return this for chaining', () => {
             const result = component.setIcon('settings');
             expect(result).toBe(component);
         });
     });
 
     describe('onClick', () => {
-        it('devrait permettre d\'ajouter un gestionnaire de clic', () => {
+        it('should allow adding a click handler', () => {
             const callback = vi.fn();
             const result = component.onClick(callback);
 
-            // Simuler un clic
+            // Simulate a click
             const event = new MouseEvent('click');
             component.extraSettingsEl.dispatchEvent(event);
 
@@ -99,27 +99,27 @@ describe('ExtraButtonComponent', () => {
             expect(result).toBe(component);
         });
 
-        it('devrait retourner this pour le chaînage', () => {
+        it('should return this for chaining', () => {
             const result = component.onClick(() => {});
             expect(result).toBe(component);
         });
 
-        it('devrait permettre plusieurs écouteurs', () => {
+        it('should allow multiple listeners', () => {
             const callback1 = vi.fn();
             const callback2 = vi.fn();
 
             component.onClick(callback1);
             component.onClick(callback2);
 
-            // Simuler un clic
+            // Simulate a click
             component.extraSettingsEl.click();
             expect(callback1).toHaveBeenCalled();
             expect(callback2).toHaveBeenCalled();
         });
     });
 
-    describe('Chaînage des méthodes', () => {
-        it('devrait permettre le chaînage de toutes les méthodes', () => {
+    describe('Method Chaining', () => {
+        it('should allow chaining of all methods', () => {
             const callback = vi.fn();
             
             component
@@ -133,7 +133,7 @@ describe('ExtraButtonComponent', () => {
             expect(component.extraSettingsEl.getAttribute('aria-label')).toBe('test tooltip');
             expect(component.extraSettingsEl.classList.contains('settings-icon')).toBe(true);
 
-            // Vérifier que le callback est bien enregistré
+            // Verify that the callback is registered
             component.extraSettingsEl.click();
             expect(callback).toHaveBeenCalled();
         });

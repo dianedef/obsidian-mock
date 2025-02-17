@@ -1,13 +1,18 @@
 import { vi } from 'vitest';
-import type { TAbstractFile, TFile, TFolder, WorkspaceLeaf } from 'obsidian';
+import { View } from 'obsidian';
+import type { TAbstractFile, TFolder, WorkspaceLeaf } from 'obsidian';
 import obsidian from '../setup';
 
-export class FileExplorerView extends obsidian.ItemView {
-    private files: Map<string, TAbstractFile> = new Map();
+export class FileExplorerView extends View {
+    files: Map<string, TAbstractFile> = new Map();
+    collapsedFolders: Set<string> = new Set();
+    currentFilter: string = '';
+    sortMethod: 'name' | 'mtime' = 'name';
     private selectedFile: TAbstractFile | null = null;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
+        this.icon = 'folder';
         
         // Création de l'interface utilisateur
         this.containerEl.classList.add('file-explorer-view');
@@ -40,34 +45,131 @@ export class FileExplorerView extends obsidian.ItemView {
     }
 
     getDisplayText(): string {
-        return 'Explorateur de fichiers';
+        return 'File Explorer';
+    }
+
+    addFile(file: TAbstractFile): void {
+        this.files.set(file.path, file);
+        this.trigger('file-added', file);
+    }
+
+    removeFile(file: TAbstractFile): void {
+        this.files.delete(file.path);
+        if (this.selectedFile === file) {
+            this.selectedFile = null;
+        }
+        this.trigger('file-deleted', file);
+    }
+
+    renameFile(file: TAbstractFile, oldPath: string): void {
+        this.files.delete(oldPath);
+        this.files.set(file.path, file);
+        this.trigger('file-renamed', file, oldPath);
+    }
+
+    getAllFiles(): TAbstractFile[] {
+        return Array.from(this.files.values());
+    }
+
+    getVisibleFiles(): TAbstractFile[] {
+        let files = this.getAllFiles();
+        if (this.currentFilter) {
+            files = files.filter(file => file.path.endsWith(this.currentFilter));
+        }
+        return this.sortFiles(files);
+    }
+
+    sortFiles(files: TAbstractFile[]): TAbstractFile[] {
+        return files.sort((a, b) => {
+            if (this.sortMethod === 'name') {
+                return a.path.localeCompare(b.path);
+            } else {
+                const statA = (a as any).stat?.mtime || 0;
+                const statB = (b as any).stat?.mtime || 0;
+                return statB - statA;
+            }
+        });
+    }
+
+    sortBy(method: 'name' | 'mtime'): void {
+        this.sortMethod = method;
+        this.trigger('sort-changed', method);
+    }
+
+    setFilter(filter: string): void {
+        this.currentFilter = filter;
+        this.trigger('filter-changed', filter);
+    }
+
+    collapseFolder(folder: TFolder): void {
+        this.collapsedFolders.add(folder.path);
+        this.trigger('folder-collapsed', folder);
+    }
+
+    expandFolder(folder: TFolder): void {
+        this.collapsedFolders.delete(folder.path);
+        this.trigger('folder-expanded', folder);
+    }
+
+    isFolderCollapsed(folder: TFolder): boolean {
+        return this.collapsedFolders.has(folder.path);
+    }
+
+    getFolderStructure(folder: TFolder): { folder: TFolder, children: TAbstractFile[] } {
+        const children = this.getAllFiles().filter(file => 
+            file.path.startsWith(folder.path + '/') && 
+            !file.path.slice(folder.path.length + 1).includes('/')
+        );
+        return { folder, children };
+    }
+
+    getState(): any {
+        return {
+            collapsedFolders: Array.from(this.collapsedFolders),
+            sortMethod: this.sortMethod,
+            filter: this.currentFilter
+        };
+    }
+
+    setViewState(state: any): Promise<void> {
+        if (state.collapsedFolders) {
+            this.collapsedFolders = new Set(state.collapsedFolders);
+        }
+        if (state.sortMethod) {
+            this.sortMethod = state.sortMethod;
+        }
+        if (state.filter) {
+            this.currentFilter = state.filter;
+        }
+        return Promise.resolve();
     }
 
     // Méthodes de gestion des fichiers
     addFile = vi.fn().mockImplementation((file: TAbstractFile): void => {
         this.files.set(file.path, file);
-        this.refresh();
+        this.trigger('file-created', file);
     });
 
-    removeFile = vi.fn().mockImplementation((file: TAbstractFile): void => {
-        this.files.delete(file.path);
-        if (this.selectedFile === file) {
-            this.selectedFile = null;
-        }
-        this.refresh();
-    });
-
-    selectFile = vi.fn().mockImplementation((file: TAbstractFile | null): void => {
-        this.selectedFile = file;
-        this.refresh();
-    });
-
-    getSelectedFile = vi.fn().mockImplementation((): TAbstractFile | null => {
-        return this.selectedFile;
+    renameFile = vi.fn().mockImplementation((file: TAbstractFile, newPath: string): void => {
+        const oldPath = file.path;
+        this.files.delete(oldPath);
+        file.path = newPath;
+        this.files.set(newPath, file);
+        this.trigger('file-renamed', file, oldPath);
     });
 
     getAllFiles = vi.fn().mockImplementation((): TAbstractFile[] => {
         return Array.from(this.files.values());
+    });
+
+    sortBy = vi.fn().mockImplementation((method: 'name' | 'mtime'): void => {
+        this.sortMethod = method;
+        const files = this.getAllFiles();
+        if (method === 'name') {
+            files.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (method === 'mtime') {
+            files.sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0));
+        }
     });
 
     // Méthodes de navigation
@@ -77,28 +179,32 @@ export class FileExplorerView extends obsidian.ItemView {
     });
 
     // Méthodes d'interface utilisateur
-    private refresh = vi.fn().mockImplementation((): void => {
+    selectFile(file: TAbstractFile): void {
+        this.selectedFile = file;
+        this.refresh();
+    }
+
+    getSelectedFile(): TAbstractFile | null {
+        return this.selectedFile;
+    }
+
+    refresh(): void {
         while (this.contentEl.firstChild) {
             this.contentEl.removeChild(this.contentEl.firstChild);
         }
         
-        // Trie les fichiers par chemin
-        const sortedFiles = Array.from(this.files.values())
-            .sort((a, b) => a.path.localeCompare(b.path));
-
-        // Recrée l'arborescence
+        const sortedFiles = this.sortFiles(Array.from(this.files.values()));
+        
         for (const file of sortedFiles) {
             const fileEl = document.createElement('div');
             fileEl.classList.add('file-explorer-item');
             
-            // Ajoute la classe appropriée selon le type
             if ('children' in file) {
                 fileEl.classList.add('file-explorer-folder');
             } else {
                 fileEl.classList.add('file-explorer-file');
             }
 
-            // Ajoute la classe selected si le fichier est sélectionné
             if (file === this.selectedFile) {
                 fileEl.classList.add('is-selected');
             }
@@ -107,10 +213,22 @@ export class FileExplorerView extends obsidian.ItemView {
             fileEl.addEventListener('click', () => this.selectFile(file));
             this.contentEl.appendChild(fileEl);
         }
-    });
+    }
 
     // Méthodes de drag & drop
-    handleDrop = vi.fn().mockImplementation((_event: DragEvent): void => {});
+    onDragStart = vi.fn().mockImplementation((event: DragEvent, file: TAbstractFile): void => {
+        event.dataTransfer?.setData('text/plain', file.path);
+        this.trigger('drag-start', file);
+    });
+
+    onDrop = vi.fn().mockImplementation((event: DragEvent, target: TFolder): void => {
+        const file = this.getSelectedFile();
+        if (file) {
+            const oldPath = file.path;
+            const newPath = `${target.path}/${file.name}`;
+            this.trigger('file-moved', file, oldPath, newPath);
+        }
+    });
 
     // Méthodes de recherche
     search = vi.fn().mockImplementation((query: string): TAbstractFile[] => {

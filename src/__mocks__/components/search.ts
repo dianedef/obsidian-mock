@@ -1,22 +1,24 @@
 import { vi } from 'vitest';
-import type { SearchComponent } from 'obsidian';
+import type { SearchComponent as ISearchComponent } from 'obsidian';
+import { Component } from './component';
 
-export class MockSearchComponent implements SearchComponent {
-    inputEl: HTMLInputElement;
+export class SearchComponent extends Component implements ISearchComponent {
+    containerEl: HTMLElement = document.createElement('div');
+    inputEl: HTMLInputElement = document.createElement('input');
     clearButtonEl: HTMLElement;
     disabled: boolean = false;
     private onChangeCallback: ((value: string) => any) | null = null;
 
-    constructor(containerEl: HTMLElement) {
-        this.inputEl = document.createElement('input');
+    constructor() {
+        super();
         this.inputEl.type = 'search';
         this.inputEl.addClass('search-input');
-        containerEl.appendChild(this.inputEl);
+        this.containerEl.appendChild(this.inputEl);
 
         this.clearButtonEl = document.createElement('button');
         this.clearButtonEl.addClass('search-clear-button');
         this.clearButtonEl.setAttribute('aria-label', 'Clear search');
-        containerEl.appendChild(this.clearButtonEl);
+        this.containerEl.appendChild(this.clearButtonEl);
 
         this.inputEl.addEventListener('input', () => {
             this.onChanged();
@@ -27,25 +29,13 @@ export class MockSearchComponent implements SearchComponent {
         });
     }
 
-    getValue = vi.fn().mockImplementation((): string => {
-        return this.inputEl.value;
-    });
-
-    setValue = vi.fn().mockImplementation((value: string): this => {
-        this.inputEl.value = value;
-        this.onChanged();
-        return this;
-    });
+    getValue = vi.fn().mockReturnValue('');
+    setValue = vi.fn();
+    onChanged = vi.fn();
 
     setPlaceholder = vi.fn().mockImplementation((placeholder: string): this => {
         this.inputEl.placeholder = placeholder;
         return this;
-    });
-
-    onChanged = vi.fn().mockImplementation((): void => {
-        const value = this.getValue();
-        this.onChangeCallback?.(value);
-        this.clearButtonEl.style.display = value ? 'block' : 'none';
     });
 
     onChange = vi.fn().mockImplementation((callback: (value: string) => any): this => {

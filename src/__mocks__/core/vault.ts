@@ -2,89 +2,226 @@ import { vi } from 'vitest';
 import type { 
     Vault as IVault, 
     TAbstractFile, 
-    TFolder,
     DataAdapter,
     ListedFiles,
-    TFile as ITFile
+    Stat,
+    EventRef,
+    DataWriteOptions
 } from 'obsidian';
 import { Events } from '../components/events';
+import { TFile } from './file';
+import { TFolder } from './folder';
 
-export class TFile implements ITFile {
-    path: string;
-    name: string;
-    parent: TFolder | null;
-    vault: IVault;
-    basename: string;
-    extension: string;
-    stat: { mtime: number; ctime: number; size: number; };
+export class MockAdapter implements DataAdapter {
+    private fileContents: Map<string, string> = new Map();
+    private fileBinaryContents: Map<string, ArrayBuffer> = new Map();
 
-    constructor(path: string, vault: IVault) {
-        this.path = path;
-        this.name = path.split('/').pop() || '';
-        this.parent = null;
-        this.vault = vault;
-        this.basename = this.name.replace(/\.[^/.]+$/, '');
-        this.extension = this.name.split('.').pop() || '';
-        this.stat = {
-            mtime: Date.now(),
-            ctime: Date.now(),
-            size: 0
+    getName = vi.fn().mockReturnValue('mock-adapter');
+    read = vi.fn().mockImplementation(async (normalizedPath: string): Promise<string> => {
+        return this.fileContents.get(normalizedPath) || '';
+    });
+    write = vi.fn().mockImplementation(async (normalizedPath: string, data: string): Promise<void> => {
+        this.fileContents.set(normalizedPath, data);
+    });
+    list = vi.fn().mockImplementation(async (normalizedPath: string): Promise<ListedFiles> => {
+        return {
+            files: Array.from(this.fileContents.keys()),
+            folders: []
         };
+    });
+
+    async exists(normalizedPath: string, sensitive?: boolean): Promise<boolean> {
+        return this.fileContents.has(normalizedPath) || this.fileBinaryContents.has(normalizedPath);
+    }
+
+    async stat(normalizedPath: string): Promise<Stat | null> {
+        const content = this.fileContents.get(normalizedPath);
+        const binaryContent = this.fileBinaryContents.get(normalizedPath);
+        if (!content && !binaryContent) return null;
+        
+        return {
+            type: 'file',
+            ctime: Date.now(),
+            mtime: Date.now(),
+            size: content ? content.length : (binaryContent ? binaryContent.byteLength : 0)
+        };
+    }
+
+    async readBinary(normalizedPath: string): Promise<ArrayBuffer> {
+        return this.fileBinaryContents.get(normalizedPath) || new ArrayBuffer(0);
+    }
+
+    async writeBinary(normalizedPath: string, data: ArrayBuffer, options?: DataWriteOptions): Promise<void> {
+        this.fileBinaryContents.set(normalizedPath, data);
+    }
+
+    async append(normalizedPath: string, data: string, options?: DataWriteOptions): Promise<void> {
+        const existingContent = await this.read(normalizedPath);
+        await this.write(normalizedPath, existingContent + data, options);
+    }
+
+    async process(normalizedPath: string, fn: (data: string) => string, options?: DataWriteOptions): Promise<string> {
+        const data = await this.read(normalizedPath);
+        const newData = fn(data);
+        await this.write(normalizedPath, newData, options);
+        return newData;
+    }
+
+    getResourcePath(normalizedPath: string): string {
+        return normalizedPath;
+    }
+
+    async mkdir(normalizedPath: string): Promise<void> {
+        // Mock implementation
+    }
+
+    async trashSystem(normalizedPath: string): Promise<boolean> {
+        this.fileContents.delete(normalizedPath);
+        this.fileBinaryContents.delete(normalizedPath);
+        return true;
+    }
+
+    async trashLocal(normalizedPath: string): Promise<void> {
+        this.fileContents.delete(normalizedPath);
+        this.fileBinaryContents.delete(normalizedPath);
+    }
+
+    async rmdir(normalizedPath: string, recursive: boolean): Promise<void> {
+        // Mock implementation
+    }
+
+    async remove(normalizedPath: string): Promise<void> {
+        this.fileContents.delete(normalizedPath);
+        this.fileBinaryContents.delete(normalizedPath);
+    }
+
+    async rename(normalizedPath: string, normalizedNewPath: string): Promise<void> {
+        const content = this.fileContents.get(normalizedPath);
+        if (content) {
+            this.fileContents.set(normalizedNewPath, content);
+            this.fileContents.delete(normalizedPath);
+        }
+        
+        const binaryContent = this.fileBinaryContents.get(normalizedPath);
+        if (binaryContent) {
+            this.fileBinaryContents.set(normalizedNewPath, binaryContent);
+            this.fileBinaryContents.delete(normalizedPath);
+        }
+    }
+
+    async copy(normalizedPath: string, normalizedNewPath: string): Promise<void> {
+        const content = this.fileContents.get(normalizedPath);
+        if (content) {
+            this.fileContents.set(normalizedNewPath, content);
+        }
+        
+        const binaryContent = this.fileBinaryContents.get(normalizedPath);
+        if (binaryContent) {
+            this.fileBinaryContents.set(normalizedNewPath, binaryContent);
+        }
     }
 }
 
 export class Vault extends Events implements IVault {
-    adapter: DataAdapter;
+    adapter: MockAdapter = new MockAdapter();
     configDir: string = '';
     files: Map<string, TFile> = new Map();
     folders: Map<string, TFolder> = new Map();
-    private cachedFiles: Map<string, string> = new Map();
+    loaded: boolean = true;
 
-    constructor() {
-        super();
-        this.adapter = {
-            getName: vi.fn().mockReturnValue('test'),
-            list: vi.fn().mockResolvedValue({ files: [], folders: [] } as ListedFiles),
-            read: vi.fn().mockResolvedValue(''),
-            readBinary: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
-            write: vi.fn().mockResolvedValue(undefined),
-            writeBinary: vi.fn().mockResolvedValue(undefined),
-            append: vi.fn().mockResolvedValue(undefined),
-            process: vi.fn().mockResolvedValue(undefined),
-            mkdir: vi.fn().mockResolvedValue(undefined),
-            exists: vi.fn().mockResolvedValue(true),
-            stat: vi.fn().mockResolvedValue({ mtime: Date.now(), size: 0, ctime: Date.now() }),
-            remove: vi.fn().mockResolvedValue(undefined),
-            rename: vi.fn().mockResolvedValue(undefined),
-            copy: vi.fn().mockResolvedValue(undefined),
-            trashSystem: vi.fn().mockResolvedValue(undefined),
-            trashLocal: vi.fn().mockResolvedValue(undefined),
-            rmdir: vi.fn().mockResolvedValue(undefined),
-            getResourcePath: vi.fn().mockReturnValue(''),
-            setFullPath: vi.fn(),
-            getFullPath: vi.fn().mockReturnValue('')
-        } as unknown as DataAdapter;
-    }
-
-    on = vi.fn().mockImplementation((name: string, callback: (...data: any) => any) => {
-        return { id: 'event-ref', name, callback };
+    // Méthodes de base
+    on = vi.fn().mockImplementation((name: string, callback: (...data: any) => any): EventRef => {
+        return super.on(name, callback);
     });
 
-    off = vi.fn();
+    off = vi.fn().mockImplementation((name: string, callback: (...data: any) => any): void => {
+        super.off(name, callback);
+    });
 
+    trigger = vi.fn().mockImplementation((name: string, ...data: any[]): void => {
+        super.trigger(name, ...data);
+    });
+
+    // Configuration
     setConfig = vi.fn();
-    getConfig = vi.fn().mockReturnValue({});
+    getConfig = vi.fn();
 
-    getName = vi.fn().mockReturnValue('test');
-    getRoot = vi.fn().mockReturnValue({
-        path: '/',
-        name: '/',
-        vault: this,
-        parent: null,
-        children: [],
-        isRoot: () => true
-    } as TFolder);
+    // Opérations sur les fichiers
+    read = vi.fn().mockImplementation(async (file: TFile | string): Promise<string> => {
+        const path = typeof file === 'string' ? file : file.path;
+        return this.adapter.read(path);
+    });
 
+    cachedRead = vi.fn().mockImplementation(async (file: TFile): Promise<string> => {
+        return this.adapter.read(file.path);
+    });
+
+    create = vi.fn().mockImplementation(async (normalizedPath: string, data: string = ''): Promise<TFile> => {
+        await this.adapter.write(normalizedPath, data);
+        const file = new TFile(normalizedPath, this as unknown as IVault);
+        this.files.set(normalizedPath, file);
+        return file;
+    });
+
+    createBinary = vi.fn().mockImplementation(async (normalizedPath: string, data: ArrayBuffer): Promise<TFile> => {
+        await this.adapter.writeBinary(normalizedPath, data);
+        const file = new TFile(normalizedPath, this as unknown as IVault);
+        this.files.set(normalizedPath, file);
+        return file;
+    });
+
+    createFolder = vi.fn().mockImplementation(async (path: string): Promise<TFolder> => {
+        await this.adapter.mkdir(path);
+        const folder = new TFolder(this as unknown as IVault, path);
+        this.folders.set(path, folder);
+        return folder;
+    });
+
+    modify = vi.fn().mockImplementation(async (file: TFile, data: string): Promise<void> => {
+        await this.adapter.write(file.path, data);
+    });
+
+    modifyBinary = vi.fn().mockImplementation(async (file: TFile, data: ArrayBuffer): Promise<void> => {
+        await this.adapter.writeBinary(file.path, data);
+    });
+
+    append = vi.fn().mockImplementation(async (file: TFile, data: string): Promise<void> => {
+        const content = await this.read(file.path);
+        await this.adapter.write(file.path, content + data);
+    });
+
+    // Gestion des fichiers
+    delete = vi.fn().mockImplementation(async (file: TAbstractFile): Promise<void> => {
+        await this.adapter.remove(file.path);
+        this.files.delete(file.path);
+    });
+
+    trash = vi.fn().mockImplementation(async (file: TAbstractFile, system: boolean): Promise<void> => {
+        if (system) {
+            await this.adapter.trashSystem(file.path);
+        } else {
+            await this.adapter.trashLocal(file.path);
+        }
+        this.files.delete(file.path);
+    });
+
+    rename = vi.fn().mockImplementation(async (file: TAbstractFile, newPath: string): Promise<void> => {
+        await this.adapter.rename(file.path, newPath);
+        if (file instanceof TFile) {
+            this.files.delete(file.path);
+            file.path = newPath;
+            this.files.set(newPath, file);
+        }
+    });
+
+    copy = vi.fn().mockImplementation(async (file: TFile, newPath: string): Promise<TFile> => {
+        await this.adapter.copy(file.path, newPath);
+        const newFile = new TFile(newPath, this as unknown as IVault);
+        this.files.set(newPath, newFile);
+        return newFile;
+    });
+
+    // Méthodes de requête
     getAbstractFileByPath = vi.fn().mockImplementation((path: string): TAbstractFile | null => {
         return this.files.get(path) || this.folders.get(path) || null;
     });
@@ -97,99 +234,38 @@ export class Vault extends Events implements IVault {
         return this.folders.get(path) || null;
     });
 
-    create = vi.fn().mockImplementation((path: string, data: string): Promise<TFile> => {
-        const file = {
-            path,
-            name: path.split('/').pop() || '',
-            vault: this,
-            parent: this.getRoot(),
-            stat: { size: data.length, mtime: Date.now(), ctime: Date.now() },
-            basename: path.split('/').pop()?.split('.')[0] || '',
-            extension: path.split('.').pop() || ''
-        } as TFile;
-        this.files.set(path, file);
-        return Promise.resolve(file);
+    getAllLoadedFiles = vi.fn().mockImplementation((): TAbstractFile[] => {
+        return [...this.files.values(), ...this.folders.values()];
     });
 
-    createBinary = vi.fn().mockImplementation((path: string, data: ArrayBuffer): Promise<TFile> => {
-        const file = {
-            path,
-            name: path.split('/').pop() || '',
-            vault: this,
-            parent: this.getRoot(),
-            stat: { size: data.byteLength, mtime: Date.now(), ctime: Date.now() },
-            basename: path.split('/').pop()?.split('.')[0] || '',
-            extension: path.split('.').pop() || ''
-        } as TFile;
-        this.files.set(path, file);
-        return Promise.resolve(file);
+    getMarkdownFiles = vi.fn().mockImplementation((): TFile[] => {
+        return Array.from(this.files.values()).filter(file => file.extension === 'md');
     });
 
-    createFolder = vi.fn().mockImplementation((path: string): Promise<TFolder> => {
-        const folder = {
-            path,
-            name: path.split('/').pop() || '',
-            vault: this,
-            parent: this.getRoot(),
-            children: [],
-            isRoot: () => false
-        } as TFolder;
-        this.folders.set(path, folder);
-        return Promise.resolve(folder);
+    getFolders = vi.fn().mockImplementation((): TFolder[] => {
+        return Array.from(this.folders.values());
     });
 
-    read = vi.fn().mockResolvedValue('');
-    readBinary = vi.fn().mockResolvedValue(new ArrayBuffer(0));
-    
-    delete = vi.fn().mockImplementation((file: TAbstractFile, force?: boolean): Promise<void> => {
-        if (file instanceof TFile) {
-            this.files.delete(file.path);
-        } else {
-            this.folders.delete(file.path);
-        }
-        return Promise.resolve();
+    getAllFolders = vi.fn().mockImplementation((): TFolder[] => {
+        return Array.from(this.folders.values());
     });
 
-    trash = vi.fn().mockImplementation((file: TAbstractFile, force?: boolean): Promise<void> => {
-        return this.delete(file, force);
+    getFiles = vi.fn().mockImplementation((): TFile[] => {
+        return Array.from(this.files.values());
     });
 
-    rename = vi.fn().mockImplementation((file: TAbstractFile, newPath: string): Promise<void> => {
-        if (file instanceof TFile) {
-            this.files.delete(file.path);
-            file.path = newPath;
-            this.files.set(newPath, file);
-        }
-        return Promise.resolve();
+    getResourcePath = vi.fn().mockImplementation((file: TFile): string => {
+        return this.adapter.getResourcePath(file.path);
     });
 
-    modify = vi.fn().mockResolvedValue(undefined);
-    modifyBinary = vi.fn().mockResolvedValue(undefined);
-    append = vi.fn().mockResolvedValue(undefined);
-    process = vi.fn().mockResolvedValue(undefined);
-    copy = vi.fn().mockImplementation(async (file: TFile, newPath: string): Promise<TFile> => {
-        const newFile = { ...file, path: newPath };
-        this.files.set(newPath, newFile as TFile);
-        return newFile as TFile;
+    readBinary = vi.fn().mockImplementation(async (file: TFile): Promise<ArrayBuffer> => {
+        return this.adapter.readBinary(file.path);
     });
 
-    getAllLoadedFiles = vi.fn().mockReturnValue([]);
-    getMarkdownFiles = vi.fn().mockReturnValue([]);
-    getCachedRead = vi.fn().mockReturnValue(null);
-
-    static recurseChildren = vi.fn().mockImplementation((folder: TFolder, cb: (file: TAbstractFile) => any): void => {
-        folder.children.forEach(child => {
-            cb(child);
-            if ('children' in child) {
-                Vault.recurseChildren(child as TFolder, cb);
-            }
-        });
+    getRoot = vi.fn().mockImplementation((): TFolder => {
+        return new TFolder(this as unknown as IVault, '/');
     });
 
-    cachedRead = vi.fn().mockImplementation((path: string) => this.cachedFiles.get(path) || null);
-    getResourcePath = vi.fn().mockReturnValue('');
-    getAllFolders = vi.fn().mockReturnValue([]);
-    getFiles = vi.fn().mockReturnValue([]);
-
-    trigger = vi.fn().mockReturnThis();
+    getName = vi.fn().mockReturnValue('mock-vault');
+    process = vi.fn();
 }

@@ -1,11 +1,22 @@
 import { vi } from 'vitest';
-import type { IconName, TooltipOptions, DomElementInfo } from 'obsidian';
+
+interface DomElementInfo {
+    cls?: string;
+    text?: string;
+    attr?: Record<string, string>;
+    title?: string;
+}
+
+type IconName = string;
+interface TooltipOptions {
+    placement?: string;
+}
 
 declare global {
     interface Element {
         addClass(cls: string): void;
         removeClass(cls: string): void;
-        toggleClass(cls: string, value: boolean): void;
+        toggleClass(cls: string, value?: boolean): void;
         setText(text: string): void;
         empty(): void;
         detach(): void;
@@ -25,8 +36,12 @@ if (typeof Element !== 'undefined') {
         this.classList.remove(cls);
     };
 
-    Element.prototype.toggleClass = function(cls: string, value: boolean): void {
-        this.classList.toggle(cls, value);
+    Element.prototype.toggleClass = function(cls: string, value?: boolean): void {
+        if (value !== undefined) {
+            this.classList.toggle(cls, value);
+        } else {
+            this.classList.toggle(cls);
+        }
     };
 
     Element.prototype.setText = function(text: string): void {
@@ -138,28 +153,47 @@ export const setTooltip = vi.fn((el: HTMLElement, tooltip: string, options?: Too
     }
 });
 
-// Étend HTMLElement avec les méthodes de manipulation de classe d'Obsidian
-HTMLElement.prototype.addClass = function(className: string): void {
-    this.classList.add(className);
-};
-
-HTMLElement.prototype.removeClass = function(className: string): void {
-    this.classList.remove(className);
-};
-
-HTMLElement.prototype.toggleClass = function(className: string, value?: boolean): void {
-    if (value !== undefined) {
-        this.classList.toggle(className, value);
-    } else {
-        this.classList.toggle(className);
+declare global {
+    interface HTMLElement {
+        addClass(cls: string): void;
+        removeClass(cls: string): void;
+        toggleClass(cls: string, value?: boolean): void;
+        setText(text: string): void;
+        getText(): string;
+        createDiv(cls?: string): HTMLElement;
+        empty(): void;
+        detach(): void;
+        contains(element: HTMLElement): boolean;
+        hasClass(cls: string): boolean;
     }
+}
+
+// Étendre le prototype de HTMLElement avec les méthodes Obsidian
+HTMLElement.prototype.addClass = function(cls: string): void {
+    this.classList.add(cls);
 };
 
-HTMLElement.prototype.hasClass = function(className: string): boolean {
-    return this.classList.contains(className);
+HTMLElement.prototype.removeClass = function(cls: string): void {
+    this.classList.remove(cls);
 };
 
-// Étend HTMLElement avec les méthodes de manipulation du DOM d'Obsidian
+HTMLElement.prototype.toggleClass = function(cls: string, value: boolean): void {
+    this.classList.toggle(cls, value);
+};
+
+HTMLElement.prototype.setText = function(text: string): void {
+    this.textContent = text;
+};
+
+HTMLElement.prototype.createDiv = function(cls?: string): HTMLElement {
+    const div = document.createElement('div');
+    if (cls) {
+        div.addClass(cls);
+    }
+    this.appendChild(div);
+    return div;
+};
+
 HTMLElement.prototype.empty = function(): void {
     while (this.firstChild) {
         this.removeChild(this.firstChild);
@@ -167,19 +201,94 @@ HTMLElement.prototype.empty = function(): void {
 };
 
 HTMLElement.prototype.detach = function(): void {
-    if (this.parentNode) {
-        this.parentNode.removeChild(this);
-    }
+    this.remove();
 };
 
-// Déclare les types pour TypeScript
-declare global {
-    interface HTMLElement {
-        addClass(className: string): void;
-        removeClass(className: string): void;
-        toggleClass(className: string, value?: boolean): void;
-        hasClass(className: string): boolean;
-        empty(): void;
-        detach(): void;
+HTMLElement.prototype.getText = function(): string {
+    return this.textContent || '';
+};
+
+HTMLElement.prototype.hasClass = function(cls: string): boolean {
+    return this.classList.contains(cls);
+};
+
+HTMLElement.prototype.contains = function(element: HTMLElement): boolean {
+    return Node.prototype.contains.call(this, element);
+};
+
+// Mock pour jsdom
+Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    })),
+});
+
+// Définition des classes DOM manquantes
+class DragEvent extends Event {
+    dataTransfer: DataTransfer;
+
+    constructor(type: string, init?: DragEventInit) {
+        super(type, init);
+        this.dataTransfer = init?.dataTransfer || new DataTransfer();
     }
-} 
+}
+
+class DataTransfer {
+    private data: Map<string, string> = new Map();
+
+    setData(format: string, data: string): void {
+        this.data.set(format, data);
+    }
+
+    getData(format: string): string {
+        return this.data.get(format) || '';
+    }
+
+    clearData(format?: string): void {
+        if (format) {
+            this.data.delete(format);
+        } else {
+            this.data.clear();
+        }
+    }
+}
+
+// Ajout des classes au global
+Object.assign(global, {
+    DragEvent,
+    DataTransfer
+});
+
+// Mock des méthodes DOM
+HTMLElement.prototype.createDiv = function(className?: string): HTMLDivElement {
+    const div = document.createElement('div');
+    if (className) {
+        div.className = className;
+    }
+    this.appendChild(div);
+    return div;
+};
+
+HTMLElement.prototype.createSpan = function(className?: string): HTMLSpanElement {
+    const span = document.createElement('span');
+    if (className) {
+        span.className = className;
+    }
+    this.appendChild(span);
+    return span;
+};
+
+HTMLElement.prototype.setText = function(text: string): void {
+    this.textContent = text;
+};
+
+// Export des types pour TypeScript
+export type { DragEvent, DataTransfer }; 

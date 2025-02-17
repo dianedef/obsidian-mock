@@ -1,41 +1,45 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MockMetadataCache } from '../../__mocks__/core/metadata-cache';
+import { MetadataCache } from '../../__mocks__/core/metadata-cache';
 import type { TFile, CachedMetadata } from 'obsidian';
 
-describe('MockMetadataCache', () => {
-    let cache: MockMetadataCache;
+describe('MetadataCache', () => {
+    let cache: MetadataCache;
     let mockFile: TFile;
 
     beforeEach(() => {
-        cache = new MockMetadataCache();
+        cache = new MetadataCache();
         mockFile = {
             path: 'test.md',
+            name: 'test.md',
             basename: 'test',
             extension: 'md',
-            stat: { ctime: Date.now(), mtime: Date.now(), size: 0 },
             parent: null,
-            vault: null,
-            name: 'test.md'
+            vault: null as any,
+            stat: {
+                ctime: Date.now(),
+                mtime: Date.now(),
+                size: 0
+            }
         };
     });
 
-    describe('Gestion des événements', () => {
-        it('devrait gérer les abonnements aux événements', () => {
+    describe('Event Management', () => {
+        it('should handle event subscriptions', () => {
             const callback = () => {};
             const eventRef = cache.on('change', callback);
             expect(eventRef).toEqual({ id: 'event-ref' });
             expect(cache.on).toHaveBeenCalledWith('change', callback);
         });
 
-        it('devrait gérer le désabonnement aux événements', () => {
+        it('should handle event unsubscriptions', () => {
             const callback = () => {};
             cache.off('change', callback);
             expect(cache.off).toHaveBeenCalledWith('change', callback);
         });
     });
 
-    describe('Gestion du cache', () => {
-        it('devrait gérer le cache des fichiers', () => {
+    describe('Cache Management', () => {
+        it('should manage file caching', () => {
             const metadata: CachedMetadata = {
                 links: [],
                 embeds: [],
@@ -48,7 +52,7 @@ describe('MockMetadataCache', () => {
             expect(cache.getFileCache(mockFile)).toStrictEqual(metadata);
         });
 
-        it('devrait supprimer le cache des fichiers', () => {
+        it('should delete file caching', () => {
             const metadata: CachedMetadata = {
                 links: [],
                 embeds: [],
@@ -62,8 +66,8 @@ describe('MockMetadataCache', () => {
         });
     });
 
-    describe('Gestion des liens', () => {
-        it('devrait convertir les fichiers en texte de lien', () => {
+    describe('Link Management', () => {
+        it('should convert files to link text', () => {
             const linktext = cache.fileToLinktext(mockFile, '', false);
             expect(linktext).toBe('test.md');
 
@@ -71,64 +75,64 @@ describe('MockMetadataCache', () => {
             expect(linktextWithoutExt).toBe('test');
         });
 
-        it('devrait résoudre les liens', () => {
+        it('should resolve links', () => {
             const resolvedFile = cache.resolveLink('test', '');
             expect(resolvedFile).toBeNull();
         });
 
-        it('devrait retourner les suggestions de liens', () => {
+        it('should return link suggestions', () => {
             const suggestions = cache.getLinkSuggestions();
             expect(Array.isArray(suggestions)).toBe(true);
             expect(suggestions).toHaveLength(0);
         });
     });
 
-    describe('Création des caches', () => {
-        it('devrait créer un cache de frontmatter', () => {
+    describe('Cache Creation', () => {
+        it('should create a frontmatter cache', () => {
             const frontmatter = { title: 'Test' };
             const cache1 = cache.createFrontMatterCache(frontmatter);
             expect(cache1.position).toBeDefined();
             expect(cache1.title).toBe('Test');
         });
 
-        it('devrait créer un cache de titre', () => {
+        it('should create a heading cache', () => {
             const heading = cache.createHeadingCache('Test', 1, 0);
             expect(heading.heading).toBe('Test');
             expect(heading.level).toBe(1);
             expect(heading.position).toBeDefined();
         });
 
-        it('devrait créer un cache de lien', () => {
+        it('should create a link cache', () => {
             const link = cache.createLinkCache('[[test]]', 0);
             expect(link.link).toBe('[[test]]');
             expect(link.position).toBeDefined();
         });
 
-        it('devrait créer un cache de tag', () => {
+        it('should create a tag cache', () => {
             const tag = cache.createTagCache('#test', 0);
             expect(tag.tag).toBe('#test');
             expect(tag.position).toBeDefined();
         });
 
-        it('devrait créer un cache d\'embed', () => {
+        it('should create an embed cache', () => {
             const embed = cache.createEmbedCache('![[test]]', 0);
             expect(embed.link).toBe('![[test]]');
             expect(embed.position).toBeDefined();
         });
 
-        it('devrait créer un cache d\'élément de liste', () => {
+        it('should create a list item cache', () => {
             const item = cache.createListItemCache('- test', 0);
             expect(item.position).toBeDefined();
             expect(item.task).toBeNull();
         });
 
-        it('devrait créer un cache de section', () => {
+        it('should create a section cache', () => {
             const section = cache.createSectionCache(0, 'paragraph');
             expect(section.type).toBe('paragraph');
             expect(section.position).toBeDefined();
         });
 
-        it('devrait créer un cache de bloc', () => {
+        it('should create a block cache', () => {
             const block = cache.createBlockCache('test-id', 'code', 0);
             expect(block.id).toBe('test-id');
             expect(block.type).toBe('code');
@@ -136,28 +140,28 @@ describe('MockMetadataCache', () => {
         });
     });
 
-    describe('Getters de cache', () => {
-        it('devrait retourner les tags', () => {
+    describe('Cache Getters', () => {
+        it('should return tags', () => {
             const tags = cache.getTags();
             expect(tags instanceof Map).toBe(true);
         });
 
-        it('devrait retourner les backlinks', () => {
+        it('should return backlinks', () => {
             const backlinks = cache.getBacklinks();
             expect(backlinks instanceof Map).toBe(true);
         });
 
-        it('devrait retourner les liens', () => {
+        it('should return links', () => {
             const links = cache.getLinks();
             expect(links instanceof Map).toBe(true);
         });
 
-        it('devrait retourner les liens résolus', () => {
+        it('should return resolved links', () => {
             const resolvedLinks = cache.getResolvedLinks();
             expect(resolvedLinks instanceof Map).toBe(true);
         });
 
-        it('devrait retourner le cache des blocs', () => {
+        it('should return the block cache', () => {
             const blockCache = cache.getBlockCache();
             expect(blockCache instanceof Map).toBe(true);
         });

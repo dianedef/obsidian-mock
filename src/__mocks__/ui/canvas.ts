@@ -153,7 +153,25 @@ export class Canvas extends Events implements ObsidianComponent {
     });
 
     // Gestion des groupes
-    createGroup = vi.fn().mockImplementation((_nodes: AllCanvasNodeData[]): void => {});
+    createGroup = vi.fn().mockImplementation((nodes: AllCanvasNodeData[]): void => {
+        // Supprimer les nœuds existants
+        nodes.forEach(node => {
+            this.data.nodes = this.data.nodes.filter(n => n.id !== node.id);
+        });
+
+        // Créer le groupe
+        const group: AllCanvasNodeData = {
+            id: 'group-' + Date.now(),
+            type: 'group',
+            x: Math.min(...nodes.map(n => n.x)),
+            y: Math.min(...nodes.map(n => n.y)),
+            width: Math.max(...nodes.map(n => n.x + n.width)) - Math.min(...nodes.map(n => n.x)),
+            height: Math.max(...nodes.map(n => n.y + n.height)) - Math.min(...nodes.map(n => n.y)),
+            children: nodes
+        };
+
+        this.data.nodes.push(group);
+    });
 
     // Gestion de la vue
     onload = vi.fn();

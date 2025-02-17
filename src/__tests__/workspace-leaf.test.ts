@@ -1,68 +1,72 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WorkspaceLeaf } from '../__mocks__/core/workspace-leaf';
-import { Events } from '../components/events';
-import type { WorkspaceParent, WorkspaceItem } from 'obsidian';
+import { Events } from '../__mocks__/components/events';
+import type { WorkspaceParent, WorkspaceItem, WorkspaceContainer } from 'obsidian';
 
-vi.mock('obsidian', () => ({
-    Events: class {
-        on = vi.fn();
-        off = vi.fn();
-        trigger = vi.fn();
-    },
-    View: class {
-        constructor(leaf: any) {
-            this.leaf = leaf;
-            this.containerEl = document.createElement('div');
-        }
-        leaf: any;
-        containerEl: HTMLElement;
-        onload() {}
-        onunload() {}
-        protected async onOpen() {}
-        protected async onClose() {}
-    }
-}));
-
-// Mock complet du parent pour les tests
-class MockParent extends Events implements WorkspaceParent {
+// Test implementation of the parent
+class TestParent extends Events implements WorkspaceParent {
     children: WorkspaceItem[] = [];
+    containerEl = document.createElement('div');
+    win = window;
+    doc = document;
     parent: WorkspaceParent | null = null;
+    collapsed = false;
 
-    getRoot(): WorkspaceParent {
+    getRoot(): WorkspaceItem {
         return this;
     }
 
-    getContainer(): WorkspaceItem {
+    getContainer(): WorkspaceContainer {
         return this;
     }
 
-    app = {
-        workspace: { activeLeaf: null }
-    };
+    addChild(child: WorkspaceItem) {
+        this.children.push(child);
+    }
+
+    removeChild(child: WorkspaceItem) {
+        const index = this.children.indexOf(child);
+        if (index > -1) {
+            this.children.splice(index, 1);
+        }
+    }
+
+    expand() {
+        this.collapsed = false;
+    }
+
+    collapse() {
+        this.collapsed = true;
+    }
+
+    toggle() {
+        this.collapsed = !this.collapsed;
+    }
+
+    offref() {}
 }
 
 describe('WorkspaceLeaf', () => {
-    let parent: MockParent;
+    let parent: TestParent;
+    let leaf: WorkspaceLeaf;
 
     beforeEach(() => {
-        parent = new MockParent();
+        parent = new TestParent();
+        leaf = new WorkspaceLeaf(parent);
     });
 
-    it('devrait créer une instance avec les propriétés par défaut', () => {
-        const leaf = new WorkspaceLeaf(parent);
+    it('should create an instance with default properties', () => {
         expect(leaf.containerEl).toBeDefined();
         expect(leaf.view).toBeDefined();
     });
 
-    it('devrait gérer correctement l\'état isDeferred', () => {
-        const leaf = new WorkspaceLeaf(parent);
+    it('should correctly handle the isDeferred state', () => {
         expect(leaf.isDeferred).toBe(false);
         leaf.loadIfDeferred();
         expect(leaf.isDeferred).toBe(false);
     });
 
-    it('devrait gérer correctement le pinning', () => {
-        const leaf = new WorkspaceLeaf(parent);
+    it('should correctly handle pinning', () => {
         expect(leaf.getViewState().pinned).toBe(false);
         leaf.setPinned(true);
         expect(leaf.getViewState().pinned).toBe(true);

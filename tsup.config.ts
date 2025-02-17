@@ -9,7 +9,9 @@ export default defineConfig({
     clean: true,
     treeshake: true,
     external: ['obsidian'],
+    platform: 'node',
     esbuildOptions(options) {
+        options.platform = 'node';
         options.footer = {
             // Préserve la compatibilité CommonJS
             js: 'if (module.exports.default) module.exports = module.exports.default;'
