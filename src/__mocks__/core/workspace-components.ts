@@ -18,14 +18,21 @@ import type {
 import { Events } from '../components/events';
 import { WorkspaceItem } from './workspace-items';
 import { WorkspaceLeaf as WorkspaceLeafImpl } from './workspace-leaf';
-import { WorkspaceContainer as WorkspaceContainerImpl } from './workspace-container';
 
-export class WorkspaceRoot extends WorkspaceContainerImpl implements IWorkspaceRoot {
+export class WorkspaceRoot extends WorkspaceItem implements IWorkspaceRoot {
     children: WorkspaceLeaf[] = [];
     activeLeaf: WorkspaceLeaf | null = null;
 
     constructor(app: App) {
-        super(app);
+        super(app, null as unknown as WorkspaceParent);
+    }
+
+    getRoot(): WorkspaceContainer {
+        return this as unknown as WorkspaceContainer;
+    }
+
+    getContainer(): WorkspaceContainer {
+        return this as unknown as WorkspaceContainer;
     }
 
     addChild(child: WorkspaceLeaf, index?: number): void {
@@ -160,9 +167,23 @@ export class WorkspaceMobileDrawer extends WorkspaceItem implements IWorkspaceMo
 
 export class WorkspaceSplit extends WorkspaceItem implements IWorkspaceSplit {
     children: WorkspaceItem[] = [];
+    app: App;
 
     constructor(parent: WorkspaceParent | null, app: App) {
-        super(app, parent);
+        super(app, parent || null as unknown as WorkspaceParent);
+        this.app = app;
+    }
+
+    getRoot(): WorkspaceContainer {
+        let root: WorkspaceParent = this;
+        while (root.parent) {
+            root = root.parent;
+        }
+        return root as WorkspaceContainer;
+    }
+
+    getContainer(): WorkspaceContainer {
+        return this.getRoot();
     }
 
     addLeaf(item: WorkspaceLeaf, index?: number): void {
@@ -225,9 +246,11 @@ export class WorkspaceSplit extends WorkspaceItem implements IWorkspaceSplit {
 
 export class WorkspaceTabs extends WorkspaceItem implements IWorkspaceTabs {
     children: WorkspaceLeaf[] = [];
+    app: App;
 
     constructor(parent: WorkspaceParent | null, app: App) {
-        super(app, parent);
+        super(app, parent || null as unknown as WorkspaceParent);
+        this.app = app;
     }
 
     addChild(child: WorkspaceLeaf, index?: number): void {
